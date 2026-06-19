@@ -139,8 +139,13 @@ const App = {
   // ── Render all tabs ───────────────────────────────────────
   _renderAll() {
     if (!this._data) return;
-    // Combine ebanistas + pintores into a single assignable people list
-    const allPeople = [...new Set([...(this._data.ebanistas || []), ...(this._data.pintores || [])])];
+    // Combine ClickUp people + anyone already in Supabase personas
+    const supabasePeople = (this._dbData.personas || []).filter(p => p.activo).map(p => p.nombre);
+    const allPeople = [...new Set([
+      ...(this._data.ebanistas || []),
+      ...(this._data.pintores  || []),
+      ...supabasePeople,
+    ])];
     const payload = { ...this._data, ebanistas: allPeople, dbData: this._dbData };
     Panel.render(payload);
     Tablero.render(payload);

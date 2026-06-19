@@ -50,8 +50,8 @@ const Panel = {
     el('panel-body').innerHTML = `
       ${noWorkPeople.length ? `<div class="panel-alert-banner">⚠ Sin asignación: ${noWorkNames}</div>` : ''}
       ${this._renderSection('Ebanistas', ebanistasData.length ? ebanistasData : unknownData, assignments)}
-      ${pintoresData.length     ? this._renderSection('Pintores', pintoresData, assignments) : ''}
       ${contratistasData.length ? this._renderSection('Contratistas', contratistasData, assignments) : ''}
+      ${pintoresData.length     ? this._renderSection('Pintores', pintoresData, assignments) : ''}
       ${ops.length === 0 ? '<div class="empty-state"><div class="empty-icon">🏭</div><p>Sin OPs activos en planta.</p><p class="muted">Verifica la conexión en ⚙ Configuración.</p></div>' : ''}
     `;
   },
