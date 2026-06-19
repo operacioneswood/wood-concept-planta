@@ -49,9 +49,10 @@ const DB = {
   },
 
   async setAsignacion(op_id, etapa, persona, fecha_asignacion = null) {
-    return this._q(sb => sb.from('asignaciones').upsert(
-      { op_id, etapa, persona, fecha_asignacion: fecha_asignacion || new Date().toISOString().slice(0,10) },
-      { onConflict: 'op_id,etapa' }
+    // Delete any previous rows for this op (one assignment per OP)
+    await this._sb.from('asignaciones').delete().eq('op_id', op_id);
+    return this._q(sb => sb.from('asignaciones').insert(
+      { op_id, etapa, persona, fecha_asignacion: fecha_asignacion || new Date().toISOString().slice(0,10) }
     ));
   },
 

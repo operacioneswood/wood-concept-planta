@@ -156,11 +156,10 @@ const Asignacion = {
         btn.style.background = '#166534';
         setTimeout(() => { btn.textContent = '✓'; btn.style.background = ''; }, 1500);
 
-        // Update local cache
-        const existing = App._dbData.asignaciones.findIndex(a => a.op_id === opId && a.etapa === (stage || '_'));
+        // Update local cache — replace ALL rows for this op (one per OP)
         const newRow = { op_id: opId, etapa: stage || '_', persona: person, fecha_asignacion: estimatedDate || todayIso() };
-        if (existing !== -1) App._dbData.asignaciones[existing] = newRow;
-        else App._dbData.asignaciones.push(newRow);
+        App._dbData.asignaciones = App._dbData.asignaciones.filter(a => a.op_id !== opId);
+        App._dbData.asignaciones.push(newRow);
 
         App.renderPanel();
         this._updateGroupCount(row);
@@ -181,7 +180,7 @@ const Asignacion = {
       });
     });
 
-    // Auto-save on select change
+    // Auto-save on select change — update cache silently, no panel re-render
     document.querySelectorAll('.asign-person, .asign-stage').forEach(sel => {
       sel.addEventListener('change', async () => {
         const opId          = sel.dataset.op;
@@ -193,14 +192,12 @@ const Asignacion = {
 
         row.classList.toggle('asign-row-assigned', !!person);
         row.classList.toggle('asign-row-empty', !person);
-
-        const existing = App._dbData.asignaciones.findIndex(a => a.op_id === opId && a.etapa === (stage || '_'));
-        const newRow = { op_id: opId, etapa: stage || '_', persona: person, fecha_asignacion: estimatedDate || todayIso() };
-        if (existing !== -1) App._dbData.asignaciones[existing] = newRow;
-        else App._dbData.asignaciones.push(newRow);
-
-        App.renderPanel();
         this._updateGroupCount(row);
+
+        // Update local cache
+        const newRow = { op_id: opId, etapa: stage || '_', persona: person, fecha_asignacion: estimatedDate || todayIso() };
+        App._dbData.asignaciones = App._dbData.asignaciones.filter(a => a.op_id !== opId);
+        App._dbData.asignaciones.push(newRow);
 
         try {
           await DB.setAsignacion(opId, stage || '_', person, estimatedDate || null);
