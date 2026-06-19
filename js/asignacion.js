@@ -122,6 +122,21 @@ const Asignacion = {
               ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>`
               : '<span class="muted-txt">—</span>'}
             <button class="btn-stage-inicio btn-sm" data-op="${esc(op.id)}" title="Marcar inicio de etapa hoy">▶ Inicio</button>
+            ${(() => {
+              if (!stage) return '';
+              const finKey   = STAGE_FIN[stage];
+              const fieldId  = this._fieldIds[finKey] || '';
+              const stageOpen = op[STAGE_INICIO[stage]] && !op[finKey];
+              if (!stageOpen || !fieldId) return '';
+              return `<button class="btn-cerrar-etapa btn-sm"
+                data-op="${esc(op.id)}"
+                data-stage="${esc(stage)}"
+                data-fieldid="${esc(fieldId)}"
+                data-datekey="${esc(finKey)}"
+                title="Marcar fin de ${esc(STAGE_LABELS[stage])} en ClickUp">
+                ✓ Cerrar ${esc(STAGE_LABELS[stage])}
+              </button>`;
+            })()}
           </div>
         </div>
         ${opAssigns.length > 0 ? `<div class="asign-chips">${chips}</div>` : ''}
@@ -246,19 +261,15 @@ const Asignacion = {
           alert('Esta asignación no tiene etapa válida'); return;
         }
 
-        const dateKey = STAGE_FIN[stage];
-        const fieldId = fieldIds?.[dateKey];
-        if (!fieldId) { alert('Campo de fin no encontrado en ClickUp'); return; }
-
         const orig = btn.textContent;
         btn.textContent = '...'; btn.disabled = true;
 
         try {
-          const chip       = btn.closest('.asign-chip');
-          const comentario = chip?.querySelector('.chip-comment')?.value || '';
-          const op         = App._data?.ops.find(o => o.id === opId);
-          const today      = todayIso();
-          const inicioKey  = STAGE_INICIO[stage];
+          const chip        = btn.closest('.asign-chip');
+          const comentario  = chip?.querySelector('.chip-comment')?.value || '';
+          const op          = App._data?.ops.find(o => o.id === opId);
+          const today       = todayIso();
+          const inicioKey   = STAGE_INICIO[stage];
           const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
 
           // Save historial before removing assignment
@@ -269,21 +280,12 @@ const Asignacion = {
           App._dbData.historial.unshift(histEntry);
           DB.upsertHistorial(histEntry).catch(e => console.warn('[Asignacion] historial:', e.message));
 
-          // Remove this person's assignment
+          // Remove this person's assignment — does NOT touch ClickUp fin date.
+          // Supervisor uses "✓ Cerrar [Etapa]" to officially close the stage.
           App._dbData.asignaciones = App._dbData.asignaciones.filter(
             a => !(a.op_id === opId && a.persona === person)
           );
           DB.removeAsignacion(opId, person).catch(e => console.warn('[Asignacion] remove:', e.message));
-
-          // Only set ClickUp fin date when nobody else is still in this stage
-          const othersInStage = App._dbData.asignaciones.filter(
-            a => a.op_id === opId && a.etapa === stage
-          );
-          if (othersInStage.length === 0) {
-            await PlantaAPI.setField(opId, fieldId, Date.now());
-            if (op) op[dateKey] = new Date();
-            PlantaAPI.clearCache();
-          }
 
           App.renderPanel();
           Proyectos.render({ ...App._data, dbData: App._dbData });
@@ -307,6 +309,35 @@ const Asignacion = {
         App.renderPanel();
         DB.removeAsignacion(opId, person).catch(e => console.warn('[Asignacion] remove:', e.message));
         rerender();
+      });
+    });
+
+    // ── ✓ Cerrar etapa (supervisor sets ClickUp fin date) ───────
+    document.querySelectorAll('.btn-cerrar-etapa').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const opId   = btn.dataset.op;
+        const stage  = btn.dataset.stage;
+        const fieldId = btn.dataset.fieldid;
+        const dateKey = btn.dataset.datekey;
+        const label  = STAGE_LABELS[stage] || stage;
+
+        if (!fieldId) { alert('Campo de fin no encontrado en ClickUp'); return; }
+        if (!confirm(`¿Confirmar cierre de ${label}?\nEsto marcará la fecha de fin en ClickUp y el OP avanzará a la siguiente etapa.`)) return;
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+
+        try {
+          const op = App._data?.ops.find(o => o.id === opId);
+          await PlantaAPI.setField(opId, fieldId, Date.now());
+          if (op) op[dateKey] = new Date();
+          PlantaAPI.clearCache();
+          Proyectos.render({ ...App._data, dbData: App._dbData });
+          rerender();
+        } catch (e) {
+          alert('Error al cerrar etapa: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
       });
     });
 

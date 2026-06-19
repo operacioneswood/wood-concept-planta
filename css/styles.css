@@ -599,6 +599,15 @@ body {
 .btn-stage-fin:hover { background: #fee2e2; }
 .btn-stage-date:disabled { opacity: .5; cursor: not-allowed; }
 
+.btn-cerrar-etapa {
+  color: #1e40af; border: 1px solid #bfdbfe; background: #dbeafe;
+  border-radius: 5px; padding: 4px 10px; font-size: 12px;
+  font-family: inherit; font-weight: 600; cursor: pointer;
+  white-space: nowrap; transition: background .15s;
+}
+.btn-cerrar-etapa:hover { background: #bfdbfe; }
+.btn-cerrar-etapa:disabled { opacity: .5; cursor: not-allowed; }
+
 /* ════════════════════════════════════════════════════════════
    ASIGNACIÓN — SEARCH BAR
    ════════════════════════════════════════════════════════════ */
