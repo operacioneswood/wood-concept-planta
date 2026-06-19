@@ -184,6 +184,7 @@ body {
 .sb-green  { background: var(--green-bg);  color: var(--green);  }
 .sb-amber  { background: var(--amber-bg);  color: var(--amber);  }
 .sb-purple { background: var(--purple-bg); color: var(--purple); }
+.sb-gray   { background: #f1f5f9; color: #64748b; }
 .sb-other  { background: var(--slate-bg);  color: var(--slate);  }
 
 .status-badge-sm {
@@ -286,6 +287,11 @@ body {
 .panel-person {
   display: flex; align-items: center; gap: 7px;
   font-weight: 600; padding-top: 3px;
+}
+.panel-op-num {
+  font-size: 11px; font-weight: 700; color: var(--primary);
+  background: #eff6ff; border-radius: 3px; padding: 1px 5px;
+  flex-shrink: 0;
 }
 .panel-op-count {
   background: var(--border); color: var(--muted);

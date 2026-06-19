@@ -20,12 +20,13 @@ const STAGE_INICIO = { corte: 'inicioCorte', chapilla: 'inicioChapilla', enchapi
 const STAGE_FIN    = { corte: 'finCorte',    chapilla: 'finChapilla',    enchapillado: 'finEnchapillado',    armado: 'finArmado',    pintura: 'finPintura'    };
 
 // ── ClickUp statuses that count as "in plant" ─────────────────
-const ACTIVE_STATUSES = new Set(['fabrica', 'en ebanisteria', 'en pintura']);
+const ACTIVE_STATUSES = new Set(['fabrica', 'en ebanisteria', 'en pintura', 'pendiente de revision']);
 
 const STATUS_DISPLAY = {
-  'fabrica':        { label: 'Fábrica',        cls: 'sb-green'  },
-  'en ebanisteria': { label: 'En Ebanistería', cls: 'sb-amber'  },
-  'en pintura':     { label: 'En Pintura',     cls: 'sb-purple' },
+  'fabrica':               { label: 'Fábrica',              cls: 'sb-green'  },
+  'en ebanisteria':        { label: 'En Ebanistería',       cls: 'sb-amber'  },
+  'en pintura':            { label: 'En Pintura',           cls: 'sb-purple' },
+  'pendiente de revision': { label: 'Pend. Revisión',       cls: 'sb-gray'   },
 };
 
 // ── Performance targets per role ─────────────────────────────

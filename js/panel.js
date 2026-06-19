@@ -82,6 +82,7 @@ const Panel = {
       return `
         <div class="panel-task-row ${idx === 0 ? 'panel-task-current' : ''}">
           <span class="panel-task-num">${idx + 1}</span>
+          ${op.noOp ? `<span class="panel-op-num">${esc(op.noOp)}</span>` : ''}
           <span class="panel-task-name">${esc(op.name)}</span>
           ${stage ? `<span class="stage-pill-sm" style="color:${color}">${esc(stage)}</span>` : ''}
           ${this._statusBadge(op.status)}
