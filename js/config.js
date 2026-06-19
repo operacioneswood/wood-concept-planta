@@ -30,8 +30,9 @@ const STATUS_DISPLAY = {
 
 // ── Performance targets per role ─────────────────────────────
 const TARGETS = {
-  ebanista: { weekly: 5,  monthly: 20 },
-  pintor:   { weekly: 3,  monthly: 12 },
+  ebanista:   { weekly: 5,  monthly: 20 },
+  pintor:     { weekly: 3,  monthly: 12 },
+  contratista:{ weekly: 3,  monthly: 12 },
 };
 
 // ── Contratistas conocidos (auto-clasificados en primer sync) ─

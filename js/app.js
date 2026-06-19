@@ -65,17 +65,19 @@ const App = {
 
   async _loadDbData() {
     try {
-      const [asignaciones, prioridades, produccion, personas] = await Promise.all([
+      const [asignaciones, prioridades, produccion, personas, historial] = await Promise.all([
         DB.getAsignaciones(),
         DB.getPrioridades(),
         DB.getProduccion(),
         DB.getPersonas(),
+        DB.getHistorial(),
       ]);
       this._dbData = {
         asignaciones: asignaciones || [],
         prioridades:  prioridades  || [],
         produccion:   produccion   || [],
         personas:     personas     || [],
+        historial:    historial    || [],
       };
     } catch (e) {
       console.error('[App] DB load failed:', e.message);

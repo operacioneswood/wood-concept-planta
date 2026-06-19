@@ -608,6 +608,17 @@ body {
   letter-spacing: .08em; color: var(--muted); margin-bottom: 16px;
 }
 
+.rend-section-title {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  margin: 24px 0 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--divider);
+}
+.rend-section-title:first-of-type { margin-top: 0; }
+.rend-section-sub {
+  font-weight: 400; font-size: 11px; color: var(--muted);
+  margin-left: 6px; text-transform: none; letter-spacing: 0;
+}
+
 .rend-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
