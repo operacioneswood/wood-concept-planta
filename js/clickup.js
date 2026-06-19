@@ -119,8 +119,9 @@ const PlantaAPI = {
 
   // ── Detect custom field IDs from raw tasks ────────────────
   _detectFields(rawTasks) {
-    const fieldMap    = {};   // normalizedName → { id, type, typeConfig }
+    const fieldMap     = {};   // normalizedName → { id, type, typeConfig }
     const ebanistasSet = new Set();
+    const pintoresSet  = new Set();
 
     for (const t of rawTasks) {
       for (const cf of (t.custom_fields || [])) {
@@ -132,6 +133,12 @@ const PlantaAPI = {
         if (norm.includes('ebanista') && cf.type === 'drop_down') {
           for (const opt of (cf.type_config?.options || [])) {
             if (opt.name) ebanistasSet.add(opt.name);
+          }
+        }
+        // Collect pintor dropdown options
+        if (norm.includes('pintor') && cf.type === 'drop_down') {
+          for (const opt of (cf.type_config?.options || [])) {
+            if (opt.name) pintoresSet.add(opt.name);
           }
         }
       }
@@ -164,6 +171,7 @@ const PlantaAPI = {
         cliente:            find('cliente'),
       },
       ebanistas: [...ebanistasSet].sort(),
+      pintores:  [...pintoresSet].sort(),
     };
   },
 
@@ -273,7 +281,7 @@ const PlantaAPI = {
     prog(`Procesando ${rawTasks.length} tareas...`);
 
     // Detect fields
-    const { fieldIds, ebanistas } = this._detectFields(rawTasks);
+    const { fieldIds, ebanistas, pintores } = this._detectFields(rawTasks);
 
     // Build a full node map for chain traversal: id → { name, parent }
     const nodeMap = {};
@@ -312,7 +320,7 @@ const PlantaAPI = {
 
     prog(`${ops.length} OPs activos encontrados.`);
 
-    const result = { ops, ebanistas, fieldIds, lastSync: Date.now() };
+    const result = { ops, ebanistas, pintores, fieldIds, lastSync: Date.now() };
     this._setCache(result);
     return result;
   },

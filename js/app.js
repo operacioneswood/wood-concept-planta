@@ -92,8 +92,8 @@ const App = {
       });
       // Refresh DB data on each sync
       await this._loadDbData();
-      // Seed personas from ClickUp ebanistas list
-      await this._seedPersonas(this._data.ebanistas || []);
+      // Seed personas from ClickUp ebanistas + pintores dropdowns
+      await this._seedPersonas(this._data.ebanistas || [], this._data.pintores || []);
       // Auto-historial cross-reference
       await Sync.runAutoHistorial(this._data.ops || [], this._dbData.asignaciones);
       this._renderAll();
@@ -105,18 +105,21 @@ const App = {
   },
 
   // Seed personas table with names from ClickUp EBANISTA dropdown (non-destructive)
-  async _seedPersonas(ebanistas) {
+  async _seedPersonas(ebanistas, pintores = []) {
     const existingMap = this.buildPersonasMap(this._dbData);
-    const toInsert    = ebanistas.filter(name => !existingMap[name]);
-    for (const name of toInsert) {
+    let changed = false;
+
+    for (const name of ebanistas) {
+      if (existingMap[name]) continue;
       const tipo = CONTRATISTAS_CONOCIDOS.has(normStr(name)) ? 'contratista' : 'ebanista';
-      try {
-        await DB.upsertPersona(name, tipo);
-      } catch (e) {
-        console.warn('[App] persona seed failed:', name, e.message);
-      }
+      try { await DB.upsertPersona(name, tipo); changed = true; } catch (e) { console.warn('[App] seed:', name, e.message); }
     }
-    if (toInsert.length) {
+    for (const name of pintores) {
+      if (existingMap[name]) continue;
+      try { await DB.upsertPersona(name, 'pintor'); changed = true; } catch (e) { console.warn('[App] seed:', name, e.message); }
+    }
+
+    if (changed) {
       this._dbData.personas = await DB.getPersonas().catch(() => this._dbData.personas);
     }
   },
@@ -136,7 +139,9 @@ const App = {
   // ── Render all tabs ───────────────────────────────────────
   _renderAll() {
     if (!this._data) return;
-    const payload = { ...this._data, dbData: this._dbData };
+    // Combine ebanistas + pintores into a single assignable people list
+    const allPeople = [...new Set([...(this._data.ebanistas || []), ...(this._data.pintores || [])])];
+    const payload = { ...this._data, ebanistas: allPeople, dbData: this._dbData };
     Panel.render(payload);
     Tablero.render(payload);
     Proyectos.render(payload);
@@ -207,7 +212,7 @@ const App = {
   _renderRolesList() {
     const container = el('cfg-roles-list');
     if (!container) return;
-    const people      = this._data?.ebanistas || [];
+    const people = [...new Set([...(this._data?.ebanistas || []), ...(this._data?.pintores || [])])];
     const personasMap = this.buildPersonasMap(this._dbData);
 
     if (!people.length) {
