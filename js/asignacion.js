@@ -180,7 +180,7 @@ const Asignacion = {
       });
     });
 
-    // Auto-save on select change — update cache silently, no panel re-render
+    // Auto-save on select change — optimistic: update cache + panel instantly, then persist
     document.querySelectorAll('.asign-person, .asign-stage').forEach(sel => {
       sel.addEventListener('change', async () => {
         const opId          = sel.dataset.op;
@@ -194,11 +194,15 @@ const Asignacion = {
         row.classList.toggle('asign-row-empty', !person);
         this._updateGroupCount(row);
 
-        // Update local cache
+        // Update local cache immediately
         const newRow = { op_id: opId, etapa: stage || '_', persona: person, fecha_asignacion: estimatedDate || todayIso() };
         App._dbData.asignaciones = App._dbData.asignaciones.filter(a => a.op_id !== opId);
         App._dbData.asignaciones.push(newRow);
 
+        // Re-render panel instantly (no Supabase wait)
+        App.renderPanel();
+
+        // Persist to Supabase in background
         try {
           await DB.setAsignacion(opId, stage || '_', person, estimatedDate || null);
         } catch (e) {
