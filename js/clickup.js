@@ -228,6 +228,21 @@ const PlantaAPI = {
     };
   },
 
+  // ── Set a custom date field value on a task ──────────────
+  async setField(taskId, fieldId, valueMs) {
+    const apiKey = this.getApiKey();
+    const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/field/${fieldId}`, {
+      method:  'POST',
+      headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ value: valueMs }),
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => String(res.status));
+      throw new Error(`ClickUp field ${res.status}: ${msg}`);
+    }
+    return res.json();
+  },
+
   // ── Mark OP complete in ClickUp ──────────────────────────
   async markComplete(opId, statusName = 'BODEGA') {
     const apiKey = this.getApiKey();

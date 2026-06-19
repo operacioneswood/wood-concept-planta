@@ -534,7 +534,7 @@ body {
 }
 .asign-table-head {
   display: grid;
-  grid-template-columns: 1fr 110px 140px 130px 130px 145px;
+  grid-template-columns: 1fr 110px 140px 130px 130px 210px;
   padding: 8px 14px;
   background: var(--divider); gap: 10px;
   font-size: 11px; font-weight: 700;
@@ -543,7 +543,7 @@ body {
 }
 .asign-row {
   display: grid;
-  grid-template-columns: 1fr 110px 140px 130px 130px 145px;
+  grid-template-columns: 1fr 110px 140px 130px 130px 210px;
   padding: 10px 14px; gap: 10px;
   border-top: 1px solid var(--divider);
   align-items: center; font-size: 13px;
@@ -573,7 +573,18 @@ body {
 }
 .asign-date:focus { outline: none; border-color: var(--blue); }
 
-.asign-actions { display: flex; gap: 5px; }
+.asign-actions { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.btn-stage-date {
+  font-size: 11px; padding: 3px 7px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--r); cursor: pointer; color: var(--text);
+  transition: background .15s;
+}
+.btn-stage-inicio { color: #166534; border-color: #bbf7d0; background: #f0fdf4; }
+.btn-stage-inicio:hover { background: #dcfce7; }
+.btn-stage-fin    { color: #991b1b; border-color: #fecaca; background: #fef2f2; }
+.btn-stage-fin:hover { background: #fee2e2; }
+.btn-stage-date:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ════════════════════════════════════════════════════════════
    RENDIMIENTO TAB

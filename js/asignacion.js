@@ -6,7 +6,7 @@
 const Asignacion = {
   _collapsed: new Set(),
 
-  render({ ops, ebanistas, dbData }) {
+  render({ ops, ebanistas, dbData, fieldIds }) {
     const body = el('asignacion-body');
 
     if (!ops.length) {
@@ -23,7 +23,7 @@ const Asignacion = {
       this._renderGroup(proj, projOps, assignments, ebanistas)
     ).join('');
 
-    this._bindEvents(ops, ebanistas);
+    this._bindEvents(ops, ebanistas, fieldIds);
   },
 
   _groupByProject(ops, priority) {
@@ -112,12 +112,14 @@ const Asignacion = {
         <div class="asign-actions">
           <button class="btn-save-asign btn-primary btn-sm" data-op="${esc(op.id)}">✓</button>
           <button class="btn-complete-op btn-secondary btn-sm" data-op="${esc(op.id)}" data-name="${esc(op.name)}">✔ Listo</button>
+          <button class="btn-stage-date btn-stage-inicio btn-sm" data-op="${esc(op.id)}" title="Marcar inicio de etapa hoy">▶ Inicio</button>
+          <button class="btn-stage-date btn-stage-fin btn-sm" data-op="${esc(op.id)}" title="Marcar fin de etapa hoy">■ Fin</button>
         </div>
       </div>
     `;
   },
 
-  _bindEvents(ops, ebanistas) {
+  _bindEvents(ops, ebanistas, fieldIds) {
     // Collapse/expand groups
     document.querySelectorAll('.asign-group-hdr').forEach(hdr => {
       hdr.addEventListener('click', e => {
@@ -180,6 +182,9 @@ const Asignacion = {
       });
     });
 
+    // Inicio / Fin stage buttons
+    this._bindStageDates(fieldIds);
+
     // Auto-save on select change — optimistic: update cache + panel instantly, then persist
     document.querySelectorAll('.asign-person, .asign-stage').forEach(sel => {
       sel.addEventListener('change', async () => {
@@ -208,6 +213,47 @@ const Asignacion = {
         } catch (e) {
           console.error('[Asignacion] auto-save failed:', e.message);
         }
+      });
+    });
+  },
+
+  _bindStageDates(fieldIds) {
+    this._bindStageDateBtn('.btn-stage-inicio', STAGE_INICIO);
+    this._bindStageDateBtn('.btn-stage-fin',    STAGE_FIN);
+  },
+
+  _bindStageDateBtn(selector, stageMap) {
+    document.querySelectorAll(selector).forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const opId = btn.dataset.op;
+        const row  = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
+        const stage = row?.querySelector('.asign-stage')?.value;
+
+        if (!stage || stage === '_' || stage === 'reproceso') {
+          alert('Selecciona una etapa válida primero'); return;
+        }
+
+        const dateKey = stageMap[stage];           // e.g. 'inicioCorte'
+        const fieldId = fieldIds?.[dateKey];
+        if (!fieldId) { alert('Campo de fecha no encontrado en ClickUp'); return; }
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+
+        try {
+          await PlantaAPI.setField(opId, fieldId, Date.now());
+          // Update local OP so Proyectos bar refreshes immediately
+          const op = App._data?.ops.find(o => o.id === opId);
+          if (op) op[dateKey] = new Date();
+          PlantaAPI.clearCache();
+          Proyectos.render({ ...App._data, dbData: App._dbData });
+          btn.textContent = '✓'; btn.style.color = 'var(--green)';
+          setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
+        } catch (e) {
+          alert('Error al actualizar ClickUp: ' + e.message);
+          btn.textContent = orig;
+        }
+        btn.disabled = false;
       });
     });
   },
