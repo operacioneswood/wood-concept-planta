@@ -35,7 +35,9 @@ const TARGETS = {
 };
 
 // ── Default ClickUp connection ────────────────────────────────
-const DEFAULT_API_KEY = 'pk_88470791_HQLTVBC5M58X1SD3H6BHDSYQFLIX931H';
+// Credentials are stored in localStorage (set via ⚙ Configuración).
+// Never hardcode the API key here — this file is public in GitHub.
+const DEFAULT_API_KEY = '';
 const DEFAULT_LIST_ID = '90090072307';
 
 // ── Shared utilities ──────────────────────────────────────────
