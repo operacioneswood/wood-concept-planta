@@ -34,6 +34,11 @@ const TARGETS = {
   pintor:   { weekly: 3,  monthly: 12 },
 };
 
+// ── Contratistas conocidos (auto-clasificados en primer sync) ─
+const CONTRATISTAS_CONOCIDOS = new Set([
+  'jose','simon','david','alex','valentin','lizardo','dimas',
+]);
+
 // ── Default ClickUp connection ────────────────────────────────
 // Credentials are stored in localStorage (set via ⚙ Configuración).
 // Never hardcode the API key here — this file is public in GitHub.

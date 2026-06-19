@@ -45,7 +45,9 @@ const Rendimiento = {
       }
     });
 
-    const people = ebanistas.length ? ebanistas : Object.keys(personasMap);
+    // Exclude contratistas — no tienen meta de producción fija
+    const people = (ebanistas.length ? ebanistas : Object.keys(personasMap))
+      .filter(name => personasMap[name] !== 'contratista');
 
     if (!people.length) {
       el('rendimiento-body').innerHTML = '<div class="empty-state"><p>Sincroniza con ClickUp para ver el personal.</p></div>';

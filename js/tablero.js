@@ -7,7 +7,7 @@ const Tablero = {
 
   render({ ops, dbData }) {
     this._renderPriority(ops, dbData);
-    this._renderProductionLog(dbData);
+    this._renderContratistas(ops, dbData);
   },
 
   // ── Left column: priority order (by project) ─────────────
@@ -102,39 +102,55 @@ const Tablero = {
     DB.setPrioridades(rows).catch(e => console.error('[Tablero] priority save failed:', e.message));
   },
 
-  // ── Right column: production log ─────────────────────────
-  _renderProductionLog(dbData) {
-    const log = (dbData?.produccion || []).map(r => ({
-      name:         r.nombre_op,
-      project:      r.proyecto,
-      person:       r.persona,
-      completedDate: r.fecha_salida,
-      isReproceso:  r.es_reproceso,
-      daysInPlant:  r.dias_en_planta,
-    }));
+  // ── Right column: active OPs assigned to contratistas ────
+  _renderContratistas(ops, dbData) {
+    const assignments  = App.buildAssignments(dbData);
+    const personasMap  = App.buildPersonasMap(dbData);
 
-    el('tablero-prod-count').textContent = log.length;
+    // All contractor names (from personas table)
+    const contratistas = (dbData?.personas || [])
+      .filter(p => p.tipo === 'contratista' && p.activo)
+      .map(p => p.nombre)
+      .sort();
+
+    el('tablero-prod-count').textContent = contratistas.length;
 
     const container = el('tablero-prod-list');
-    if (!log.length) {
-      container.innerHTML = '<div class="empty-state-sm">Sin OPs completados aún</div>';
+
+    if (!contratistas.length) {
+      container.innerHTML = '<div class="empty-state-sm">Sin contratistas registrados</div>';
       return;
     }
 
-    container.innerHTML = log.map(e => `
-      <div class="prod-log-item ${e.isReproceso ? 'prod-log-reproceso' : ''}">
-        <div class="prod-log-top">
-          <span class="prod-log-name">${esc(e.name)}</span>
-          ${e.isReproceso ? '<span class="badge-reproceso">Reproceso</span>' : ''}
+    // Build op map for quick lookup
+    const opMap = Object.fromEntries(ops.map(o => [o.id, o]));
+
+    container.innerHTML = contratistas.map(name => {
+      // Find all OPs assigned to this contractor
+      const myOpIds = Object.entries(assignments)
+        .filter(([, a]) => a.person === name)
+        .map(([opId]) => opId);
+      const myOps = myOpIds.map(id => opMap[id]).filter(Boolean);
+
+      return `
+        <div class="prod-log-item">
+          <div class="prod-log-top">
+            <span class="prod-log-name">${esc(name)}</span>
+            ${myOps.length ? `<span class="tbl-assignee">${myOps.length} OP${myOps.length !== 1 ? 's' : ''}</span>` : '<span class="muted-txt">Sin asignar</span>'}
+          </div>
+          ${myOps.map(op => {
+            const stage = getCurrentStage(op);
+            return `
+              <div class="prod-log-meta" style="margin-top:4px">
+                <span style="font-size:12px">${esc(op.name)}</span>
+                ${stage ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>` : ''}
+                ${this._statusBadgeSm(op.status)}
+              </div>
+            `;
+          }).join('')}
         </div>
-        <div class="prod-log-meta">
-          ${e.project ? `<span>${esc(e.project)}</span>` : ''}
-          ${e.person  ? `<span class="tbl-assignee">${esc(e.person)}</span>` : ''}
-          ${e.completedDate ? `<span>✓ ${esc(e.completedDate)}</span>` : ''}
-          ${e.daysInPlant != null ? `<span class="muted-txt">${e.daysInPlant}d en planta</span>` : ''}
-        </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   },
 
   _statusBadgeSm(status) {

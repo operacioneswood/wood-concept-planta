@@ -15,12 +15,15 @@ const Panel = {
       return { name, role, myOps };
     });
 
-    const ebanistasData = personData.filter(p => p.role === 'ebanista');
-    const pintoresData  = personData.filter(p => p.role === 'pintor');
-    const unknownData   = personData.filter(p => !personasMap[p.name]);
+    const ebanistasData    = personData.filter(p => p.role === 'ebanista');
+    const pintoresData     = personData.filter(p => p.role === 'pintor');
+    const contratistasData = personData.filter(p => p.role === 'contratista');
+    const unknownData      = personData.filter(p => !personasMap[p.name]);
 
+    // Only plant employees count for "sin trabajo" alerts
+    const plantaPeople  = [...ebanistasData, ...pintoresData, ...(ebanistasData.length ? [] : unknownData)];
     const unassignedOps = ops.filter(op => !assignments[op.id]?.person);
-    const noWorkPeople  = personData.filter(p => p.myOps.length === 0);
+    const noWorkPeople  = plantaPeople.filter(p => p.myOps.length === 0);
 
     // Metrics strip
     el('panel-metrics').innerHTML = `
@@ -29,8 +32,8 @@ const Panel = {
         <div class="metric-lbl">OPs activos</div>
       </div>
       <div class="metric-card">
-        <div class="metric-val">${ebanistas.length}</div>
-        <div class="metric-lbl">Personal</div>
+        <div class="metric-val">${plantaPeople.length}</div>
+        <div class="metric-lbl">Personal planta</div>
       </div>
       <div class="metric-card ${unassignedOps.length > 0 ? 'metric-warn' : ''}">
         <div class="metric-val">${unassignedOps.length}</div>
@@ -47,7 +50,8 @@ const Panel = {
     el('panel-body').innerHTML = `
       ${noWorkPeople.length ? `<div class="panel-alert-banner">⚠ Sin asignación: ${noWorkNames}</div>` : ''}
       ${this._renderSection('Ebanistas', ebanistasData.length ? ebanistasData : unknownData, assignments)}
-      ${pintoresData.length ? this._renderSection('Pintores', pintoresData, assignments) : ''}
+      ${pintoresData.length     ? this._renderSection('Pintores', pintoresData, assignments) : ''}
+      ${contratistasData.length ? this._renderSection('Contratistas', contratistasData, assignments) : ''}
       ${ops.length === 0 ? '<div class="empty-state"><div class="empty-icon">🏭</div><p>Sin OPs activos en planta.</p><p class="muted">Verifica la conexión en ⚙ Configuración.</p></div>' : ''}
     `;
   },

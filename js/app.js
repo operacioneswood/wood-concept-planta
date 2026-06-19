@@ -109,8 +109,9 @@ const App = {
     const existingMap = this.buildPersonasMap(this._dbData);
     const toInsert    = ebanistas.filter(name => !existingMap[name]);
     for (const name of toInsert) {
+      const tipo = CONTRATISTAS_CONOCIDOS.has(normStr(name)) ? 'contratista' : 'ebanista';
       try {
-        await DB.upsertPersona(name, 'ebanista');
+        await DB.upsertPersona(name, tipo);
       } catch (e) {
         console.warn('[App] persona seed failed:', name, e.message);
       }
@@ -214,23 +215,31 @@ const App = {
       return;
     }
 
-    container.innerHTML = people.map(name => `
-      <div class="role-row">
-        <span class="role-name">${esc(name)}</span>
-        <div class="role-radios">
-          <label class="role-label">
-            <input type="radio" name="role-${esc(name.replace(/\s/g,'_'))}" value="ebanista"
-              ${(personasMap[name] || 'ebanista') === 'ebanista' ? 'checked' : ''}>
-            Ebanista
-          </label>
-          <label class="role-label">
-            <input type="radio" name="role-${esc(name.replace(/\s/g,'_'))}" value="pintor"
-              ${personasMap[name] === 'pintor' ? 'checked' : ''}>
-            Pintor
-          </label>
+    container.innerHTML = people.map(name => {
+      const tipo = personasMap[name] || (CONTRATISTAS_CONOCIDOS.has(normStr(name)) ? 'contratista' : 'ebanista');
+      return `
+        <div class="role-row">
+          <span class="role-name">${esc(name)}</span>
+          <div class="role-radios">
+            <label class="role-label">
+              <input type="radio" name="role-${esc(name.replace(/\s/g,'_'))}" value="ebanista"
+                ${tipo === 'ebanista' ? 'checked' : ''}>
+              Ebanista
+            </label>
+            <label class="role-label">
+              <input type="radio" name="role-${esc(name.replace(/\s/g,'_'))}" value="pintor"
+                ${tipo === 'pintor' ? 'checked' : ''}>
+              Pintor
+            </label>
+            <label class="role-label">
+              <input type="radio" name="role-${esc(name.replace(/\s/g,'_'))}" value="contratista"
+                ${tipo === 'contratista' ? 'checked' : ''}>
+              Contratista
+            </label>
+          </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
     container.querySelectorAll('input[type="radio"]').forEach(radio => {
       radio.addEventListener('change', async () => {
