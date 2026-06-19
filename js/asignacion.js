@@ -87,9 +87,11 @@ const Asignacion = {
     return `
       <div class="asign-row ${a?.person ? 'asign-row-assigned' : 'asign-row-empty'}" data-op-id="${esc(op.id)}">
         <div class="asign-name">
-          ${esc(op.name)}
+          <div>
+            ${op.noOp ? `<span class="asign-op-num">${esc(op.noOp)}</span> ` : ''}${esc(op.name)}
+            ${hasReproceso ? '<span class="badge-reproceso-sm">Reproceso</span>' : ''}
+          </div>
           ${op.project ? `<div class="asign-proj-sub">${esc(op.project)}</div>` : ''}
-          ${hasReproceso ? '<span class="badge-reproceso-sm">Reproceso</span>' : ''}
         </div>
         <div>
           ${stage

@@ -139,11 +139,12 @@ const Rendimiento = {
         ${myRows.length > 0 ? `
           <div class="rend-log-preview">
             ${myRows.slice(0, 4).map(r => {
-              const opName = ops.find(o => o.id === r.op_id)?.name || r.op_id;
+              const opData  = ops.find(o => o.id === r.op_id);
+              const opLabel = opData?.noOp || opData?.name || r.op_id;
               return `
               <div class="rend-log-item">
                 <span class="${r.es_reproceso ? 'rend-log-repro' : ''}">
-                  ${esc(opName)}
+                  ${esc(opLabel)}
                   <span class="rend-log-stage">${esc(STAGE_LABELS[r.etapa] || r.etapa)}</span>
                 </span>
                 <span class="muted-txt">${esc(r.fecha_fin || '')}</span>

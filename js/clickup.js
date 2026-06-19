@@ -166,6 +166,7 @@ const PlantaAPI = {
         inicioReproceso:    find('inicio reproceso'),
         finReproceso:       find('fin reproceso'),
         causaReproceso:     find('causa reproceso'),
+        noOp:               find('no. op', 'no op', 'nro. op', 'nro op', 'numero op', 'num op'),
         nivel:              find('nivel'),
         ebanista:           find('ebanista'),
         cliente:            find('cliente'),
@@ -201,9 +202,13 @@ const PlantaAPI = {
     const causa     = typeof causaRaw === 'string' ? causaRaw :
                       (causaRaw?.name || null);
 
+    const noOpRaw   = getField(fieldIds.noOp);
+    const noOp      = noOpRaw !== null && noOpRaw !== undefined ? String(noOpRaw) : '';
+
     return {
       id:                  raw.id,
       name:                raw.name || '',
+      noOp,
       parent:              raw.parent || null,
       project:             raw.folder?.name || raw.list?.name || '',
       client,
