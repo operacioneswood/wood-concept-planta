@@ -25,11 +25,19 @@ const Asignacion = {
     const priority    = App.buildPriorities(dbData);
     const groups      = this._groupByProject(ops, priority);
 
-    body.innerHTML = [...groups.entries()].map(([proj, projOps]) =>
+    const groupsHtml = [...groups.entries()].map(([proj, projOps]) =>
       this._renderGroup(proj, projOps, assignments, ebanistas)
     ).join('');
 
+    body.innerHTML = `
+      <div class="asign-search-wrap">
+        <input type="search" id="asign-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre...">
+      </div>
+      ${groupsHtml}
+    `;
+
     this._bindEvents(ops, ebanistas, fieldIds || {});
+    this._bindSearch();
   },
 
   _rerender() {
@@ -97,8 +105,10 @@ const Asignacion = {
       </div>
     `).join('');
 
+    const searchText = `${op.project || ''} ${op.noOp || ''} ${op.name || ''}`.toLowerCase();
+
     return `
-      <div class="asign-card ${isAssigned ? 'asign-row-assigned' : 'asign-row-empty'}" data-op-id="${esc(op.id)}">
+      <div class="asign-card ${isAssigned ? 'asign-row-assigned' : 'asign-row-empty'}" data-op-id="${esc(op.id)}" data-search="${esc(searchText)}">
         <div class="asign-card-hdr">
           <div class="asign-name">
             <div>
@@ -129,6 +139,22 @@ const Asignacion = {
         </div>
       </div>
     `;
+  },
+
+  _bindSearch() {
+    const input = document.getElementById('asign-search');
+    if (!input) return;
+    input.addEventListener('input', () => {
+      const q = input.value.toLowerCase().trim();
+      document.querySelectorAll('.asign-card').forEach(card => {
+        const match = !q || (card.dataset.search || '').includes(q);
+        card.style.display = match ? '' : 'none';
+      });
+      document.querySelectorAll('.asign-group').forEach(group => {
+        const anyVisible = [...group.querySelectorAll('.asign-card')].some(c => c.style.display !== 'none');
+        group.style.display = anyVisible ? '' : 'none';
+      });
+    });
   },
 
   _bindEvents(ops, ebanistas, fieldIds) {

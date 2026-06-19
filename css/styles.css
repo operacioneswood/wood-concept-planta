@@ -293,6 +293,11 @@ body {
   background: #eff6ff; border-radius: 3px; padding: 1px 5px;
   flex-shrink: 0;
 }
+.panel-proj-lbl {
+  font-size: 11px; color: var(--muted); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 130px;
+  flex-shrink: 1;
+}
 .panel-op-count {
   background: var(--border); color: var(--muted);
   border-radius: 20px; padding: 1px 7px;
@@ -593,6 +598,19 @@ body {
 .btn-stage-fin    { color: #991b1b; border-color: #fecaca; background: #fef2f2; }
 .btn-stage-fin:hover { background: #fee2e2; }
 .btn-stage-date:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ════════════════════════════════════════════════════════════
+   ASIGNACIÓN — SEARCH BAR
+   ════════════════════════════════════════════════════════════ */
+.asign-search-wrap { margin-bottom: 16px; }
+.asign-search-input {
+  width: 100%; border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 14px;
+  font-size: 13px; font-family: inherit; color: var(--text);
+  background: var(--card); transition: border-color .15s;
+}
+.asign-search-input:focus { outline: none; border-color: var(--blue); }
+.asign-search-input::placeholder { color: var(--faint); }
 
 /* ════════════════════════════════════════════════════════════
    ASIGNACIÓN — CARD + CHIP LAYOUT
