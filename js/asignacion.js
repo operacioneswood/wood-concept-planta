@@ -6,7 +6,7 @@
 const Asignacion = {
   _collapsed: new Set(),
 
-  render({ ops, ebanistas }) {
+  render({ ops, ebanistas, dbData }) {
     const body = el('asignacion-body');
 
     if (!ops.length) {
@@ -14,10 +14,9 @@ const Asignacion = {
       return;
     }
 
-    const assignments = Storage.getAssignments();
-    const priority    = Storage.getPriority();
+    const assignments = App.buildAssignments(dbData);
+    const priority    = App.buildPriorities(dbData);
 
-    // Group by project, preserving priority order within each group
     const groups = this._groupByProject(ops, priority);
 
     body.innerHTML = [...groups.entries()].map(([proj, projOps]) =>
@@ -28,7 +27,6 @@ const Asignacion = {
   },
 
   _groupByProject(ops, priority) {
-    // Sort ops by priority within each project
     const priorityIdx = id => { const i = priority.indexOf(id); return i === -1 ? 999 : i; };
     const map = new Map();
     for (const op of ops) {
@@ -41,8 +39,8 @@ const Asignacion = {
   },
 
   _renderGroup(projName, projOps, assignments, ebanistas) {
-    const collapsed    = this._collapsed.has(projName);
-    const safeId       = 'ag-' + projName.replace(/[^a-zA-Z0-9]/g, '_');
+    const collapsed     = this._collapsed.has(projName);
+    const safeId        = 'ag-' + projName.replace(/[^a-zA-Z0-9]/g, '_');
     const assignedCount = projOps.filter(op => assignments[op.id]?.person).length;
 
     return `
@@ -142,22 +140,36 @@ const Asignacion = {
 
     // Save assignment
     document.querySelectorAll('.btn-save-asign').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const opId  = btn.dataset.op;
-        const row   = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
+      btn.addEventListener('click', async () => {
+        const opId          = btn.dataset.op;
+        const row           = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
         if (!row) return;
         const person        = row.querySelector('.asign-person').value;
         const stage         = row.querySelector('.asign-stage').value;
         const estimatedDate = row.querySelector('.asign-date').value;
-        Storage.setAssignment(opId, { person, stage, estimatedDate });
+
+        // Optimistic UI update
         row.classList.toggle('asign-row-assigned', !!person);
         row.classList.toggle('asign-row-empty', !person);
         btn.textContent = '✓ Guardado';
         btn.style.background = '#166534';
         setTimeout(() => { btn.textContent = '✓'; btn.style.background = ''; }, 1500);
+
+        // Update local cache
+        const existing = App._dbData.asignaciones.findIndex(a => a.op_id === opId && a.etapa === (stage || '_'));
+        const newRow = { op_id: opId, etapa: stage || '_', persona: person, fecha_asignacion: estimatedDate || todayIso() };
+        if (existing !== -1) App._dbData.asignaciones[existing] = newRow;
+        else App._dbData.asignaciones.push(newRow);
+
         App.renderPanel();
-        // Update assigned count in header
-        this._updateGroupCount(row, opId);
+        this._updateGroupCount(row);
+
+        // Persist to Supabase
+        try {
+          await DB.setAsignacion(opId, stage || '_', person, estimatedDate || null);
+        } catch (e) {
+          console.error('[Asignacion] save failed:', e.message);
+        }
       });
     });
 
@@ -170,26 +182,38 @@ const Asignacion = {
 
     // Auto-save on select change
     document.querySelectorAll('.asign-person, .asign-stage').forEach(sel => {
-      sel.addEventListener('change', () => {
-        const opId  = sel.dataset.op;
-        const row   = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
+      sel.addEventListener('change', async () => {
+        const opId          = sel.dataset.op;
+        const row           = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
         if (!row) return;
         const person        = row.querySelector('.asign-person').value;
         const stage         = row.querySelector('.asign-stage').value;
         const estimatedDate = row.querySelector('.asign-date').value;
-        Storage.setAssignment(opId, { person, stage, estimatedDate });
+
         row.classList.toggle('asign-row-assigned', !!person);
         row.classList.toggle('asign-row-empty', !person);
+
+        const existing = App._dbData.asignaciones.findIndex(a => a.op_id === opId && a.etapa === (stage || '_'));
+        const newRow = { op_id: opId, etapa: stage || '_', persona: person, fecha_asignacion: estimatedDate || todayIso() };
+        if (existing !== -1) App._dbData.asignaciones[existing] = newRow;
+        else App._dbData.asignaciones.push(newRow);
+
         App.renderPanel();
-        this._updateGroupCount(row, opId);
+        this._updateGroupCount(row);
+
+        try {
+          await DB.setAsignacion(opId, stage || '_', person, estimatedDate || null);
+        } catch (e) {
+          console.error('[Asignacion] auto-save failed:', e.message);
+        }
       });
     });
   },
 
-  _updateGroupCount(row, opId) {
-    const group    = row.closest('.asign-group');
+  _updateGroupCount(row) {
+    const group   = row.closest('.asign-group');
     if (!group) return;
-    const allRows  = group.querySelectorAll('.asign-row');
+    const allRows = group.querySelectorAll('.asign-row');
     const assigned = group.querySelectorAll('.asign-row-assigned').length;
     const counter  = group.querySelector('.asign-group-assigned');
     if (counter) counter.textContent = `${assigned}/${allRows.length} asignados`;

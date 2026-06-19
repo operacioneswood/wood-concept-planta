@@ -3,10 +3,20 @@
 // ─────────────────────────────────────────────────────────────
 
 const Proyectos = {
-  _collapsed: new Set(),   // set of project names currently collapsed
+  _collapsed: new Set(),
 
-  render({ ops }) {
-    const log          = Storage.getProductionLog();
+  render({ ops, dbData }) {
+    // Produccion log from Supabase
+    const log = (dbData?.produccion || []).map(r => ({
+      name:         r.nombre_op,
+      project:      r.proyecto,
+      person:       r.persona,
+      completedDate: r.fecha_salida,
+      isReproceso:  r.es_reproceso,
+      daysInPlant:  r.dias_en_planta,
+    }));
+
+    // Contratistas stay in localStorage (not in Supabase schema)
     const contratistas = Storage.getContratistas();
     const body         = el('proyectos-body');
 
@@ -149,7 +159,7 @@ const Proyectos = {
         <thead>
           <tr>
             <th>OP / Tarea</th><th>Proyecto</th><th>Persona</th>
-            <th>Nivel</th><th>Días planta</th><th>Completado</th><th>Tipo</th>
+            <th>Días planta</th><th>Completado</th><th>Tipo</th>
           </tr>
         </thead>
         <tbody>
@@ -158,7 +168,6 @@ const Proyectos = {
               <td>${esc(e.name)}</td>
               <td class="muted-txt">${esc(e.project || '—')}</td>
               <td>${esc(e.person || '—')}</td>
-              <td>${e.nivel != null ? e.nivel.toLocaleString('es-MX') : '—'}</td>
               <td>${e.daysInPlant != null ? e.daysInPlant + 'd' : '—'}</td>
               <td class="muted-txt">${esc(e.completedDate || '—')}</td>
               <td>${e.isReproceso ? '<span class="badge-reproceso-sm">Reproceso</span>' : '<span class="badge-normal">Normal</span>'}</td>

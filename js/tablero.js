@@ -5,21 +5,21 @@
 const Tablero = {
   _dragging: null,
 
-  render({ ops }) {
-    this._renderPriority(ops);
-    this._renderProductionLog();
+  render({ ops, dbData }) {
+    this._renderPriority(ops, dbData);
+    this._renderProductionLog(dbData);
   },
 
   // ── Left column: priority order ───────────────────────────
-  _renderPriority(ops) {
-    const priority   = Storage.getPriority();
-    const assignments = Storage.getAssignments();
+  _renderPriority(ops, dbData) {
+    const priority    = App.buildPriorities(dbData);
+    const assignments = App.buildAssignments(dbData);
 
     // Merge saved order with live ops (new ops appended at end)
     const opMap       = Object.fromEntries(ops.map(o => [o.id, o]));
     const orderedIds  = [
-      ...priority.filter(id => opMap[id]),               // existing ordered
-      ...ops.filter(o => !priority.includes(o.id)).map(o => o.id), // new ones
+      ...priority.filter(id => opMap[id]),
+      ...ops.filter(o => !priority.includes(o.id)).map(o => o.id),
     ];
 
     el('tablero-prio-count').textContent = orderedIds.length;
@@ -33,10 +33,10 @@ const Tablero = {
     list.innerHTML = orderedIds.map((id, idx) => {
       const op = opMap[id];
       if (!op) return '';
-      const a = assignments[id];
+      const a     = assignments[id];
       const stage = getCurrentStage(op);
       return `
-        <div class="tablero-item" draggable="true" data-id="${esc(id)}">
+        <div class="tablero-item" draggable="true" data-id="${esc(id)}" data-name="${esc(op.name)}">
           <span class="drag-handle">⠿</span>
           <span class="tablero-rank">${idx + 1}</span>
           <div class="tablero-item-info">
@@ -52,10 +52,10 @@ const Tablero = {
       `;
     }).join('');
 
-    this._bindDragDrop(list, orderedIds);
+    this._bindDragDrop(list);
   },
 
-  _bindDragDrop(list, orderedIds) {
+  _bindDragDrop(list) {
     const items = list.querySelectorAll('.tablero-item');
     items.forEach(item => {
       item.addEventListener('dragstart', e => {
@@ -83,17 +83,31 @@ const Tablero = {
   },
 
   _savePriorityFromDOM(list) {
-    const ids = [...list.querySelectorAll('.tablero-item')].map(el => el.dataset.id);
-    Storage.setPriority(ids);
-    // Re-render ranks
+    const rows = [...list.querySelectorAll('.tablero-item')].map(el => ({
+      proyecto_id:     el.dataset.id,
+      proyecto_nombre: el.dataset.name || '',
+    }));
+    // Update ranks visually
     list.querySelectorAll('.tablero-rank').forEach((span, i) => {
       span.textContent = i + 1;
     });
+    // Update local cache immediately
+    App._dbData.prioridades = rows.map((r, i) => ({ ...r, orden: i }));
+    // Persist to Supabase (fire-and-forget)
+    DB.setPrioridades(rows).catch(e => console.error('[Tablero] priority save failed:', e.message));
   },
 
   // ── Right column: production log ─────────────────────────
-  _renderProductionLog() {
-    const log = Storage.getProductionLog();
+  _renderProductionLog(dbData) {
+    const log = (dbData?.produccion || []).map(r => ({
+      name:         r.nombre_op,
+      project:      r.proyecto,
+      person:       r.persona,
+      completedDate: r.fecha_salida,
+      isReproceso:  r.es_reproceso,
+      daysInPlant:  r.dias_en_planta,
+    }));
+
     el('tablero-prod-count').textContent = log.length;
 
     const container = el('tablero-prod-list');
@@ -112,7 +126,7 @@ const Tablero = {
           ${e.project ? `<span>${esc(e.project)}</span>` : ''}
           ${e.person  ? `<span class="tbl-assignee">${esc(e.person)}</span>` : ''}
           ${e.completedDate ? `<span>✓ ${esc(e.completedDate)}</span>` : ''}
-          ${e.daysInPlant !== null && e.daysInPlant !== undefined ? `<span class="muted-txt">${e.daysInPlant}d en planta</span>` : ''}
+          ${e.daysInPlant != null ? `<span class="muted-txt">${e.daysInPlant}d en planta</span>` : ''}
         </div>
       </div>
     `).join('');

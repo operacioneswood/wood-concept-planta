@@ -3,30 +3,83 @@
 // ─────────────────────────────────────────────────────────────
 
 const App = {
-  _data:            null,
-  _refreshTimer:    null,
-  _REFRESH_INTERVAL: 5 * 60 * 1000,   // 5 min
+  _data:             null,   // ClickUp data: { ops, ebanistas, fieldIds, lastSync }
+  _dbData:           null,   // Supabase data: { asignaciones, prioridades, produccion, personas }
+  _refreshTimer:     null,
+  _REFRESH_INTERVAL: 5 * 60 * 1000,
 
+  // ── DB data helpers (used by all tabs) ───────────────────
+  buildAssignments(dbData) {
+    const map = {};
+    for (const row of (dbData?.asignaciones || [])) {
+      // Last write wins per op_id (tabs only use one assignment per OP)
+      map[row.op_id] = { person: row.persona, stage: row.etapa, estimatedDate: row.fecha_asignacion };
+    }
+    return map;
+  },
+
+  buildPriorities(dbData) {
+    return (dbData?.prioridades || [])
+      .slice()
+      .sort((a, b) => a.orden - b.orden)
+      .map(r => r.proyecto_id);
+  },
+
+  buildPersonasMap(dbData) {
+    const map = {};
+    for (const p of (dbData?.personas || [])) {
+      map[p.nombre] = p.tipo;
+    }
+    return map;
+  },
+
+  // ── Init ─────────────────────────────────────────────────
   async init() {
+    DB.init();
     this._setupNav();
     this._setupSettings();
     this._setupCompleteModal();
 
-    // Instant render from cache
-    const cached = PlantaAPI._getCache();
-    if (cached) {
-      this._data = cached;
+    // Load Supabase data in parallel with ClickUp cache render
+    this._dbData = { asignaciones: [], prioridades: [], produccion: [], personas: [] };
+    const [cached] = await Promise.allSettled([
+      this._loadDbData(),
+    ]);
+
+    // Instant render from ClickUp cache
+    const clickupCache = PlantaAPI._getCache();
+    if (clickupCache) {
+      this._data = clickupCache;
       this._renderAll();
       this._setStatus('⚡ Desde caché', 'ok');
     } else {
       this._setStatus('Conectando...', 'loading');
     }
 
-    // Fresh fetch in background
-    await this._sync({ silent: !!cached });
+    // Fresh fetch from ClickUp
+    await this._sync({ silent: !!clickupCache });
 
-    // Auto-refresh loop
+    // Auto-refresh
     this._refreshTimer = setInterval(() => this._sync({ silent: true }), this._REFRESH_INTERVAL);
+  },
+
+  async _loadDbData() {
+    try {
+      const [asignaciones, prioridades, produccion, personas] = await Promise.all([
+        DB.getAsignaciones(),
+        DB.getPrioridades(),
+        DB.getProduccion(),
+        DB.getPersonas(),
+      ]);
+      this._dbData = {
+        asignaciones: asignaciones || [],
+        prioridades:  prioridades  || [],
+        produccion:   produccion   || [],
+        personas:     personas     || [],
+      };
+    } catch (e) {
+      console.error('[App] DB load failed:', e.message);
+    }
   },
 
   // ── Sync ─────────────────────────────────────────────────
@@ -37,11 +90,33 @@ const App = {
         force,
         onProgress: msg => { if (!silent) this._setStatus(msg, 'loading'); },
       });
+      // Refresh DB data on each sync
+      await this._loadDbData();
+      // Seed personas from ClickUp ebanistas list
+      await this._seedPersonas(this._data.ebanistas || []);
+      // Auto-historial cross-reference
+      await Sync.runAutoHistorial(this._data.ops || [], this._dbData.asignaciones);
       this._renderAll();
       this._setStatus(this._syncLabel(), 'ok');
     } catch (e) {
       console.error('[App] Sync error:', e);
       this._setStatus('Error: ' + e.message, 'error');
+    }
+  },
+
+  // Seed personas table with names from ClickUp EBANISTA dropdown (non-destructive)
+  async _seedPersonas(ebanistas) {
+    const existingMap = this.buildPersonasMap(this._dbData);
+    const toInsert    = ebanistas.filter(name => !existingMap[name]);
+    for (const name of toInsert) {
+      try {
+        await DB.upsertPersona(name, 'ebanista');
+      } catch (e) {
+        console.warn('[App] persona seed failed:', name, e.message);
+      }
+    }
+    if (toInsert.length) {
+      this._dbData.personas = await DB.getPersonas().catch(() => this._dbData.personas);
     }
   },
 
@@ -60,16 +135,17 @@ const App = {
   // ── Render all tabs ───────────────────────────────────────
   _renderAll() {
     if (!this._data) return;
-    Panel.render(this._data);
-    Tablero.render(this._data);
-    Proyectos.render(this._data);
-    Asignacion.render(this._data);
-    Rendimiento.render(this._data);
+    const payload = { ...this._data, dbData: this._dbData };
+    Panel.render(payload);
+    Tablero.render(payload);
+    Proyectos.render(payload);
+    Asignacion.render(payload);
+    Rendimiento.render(payload);
     this._renderRolesList();
   },
 
   renderPanel() {
-    if (this._data) Panel.render(this._data);
+    if (this._data) Panel.render({ ...this._data, dbData: this._dbData });
   },
 
   rerender() {
@@ -130,8 +206,8 @@ const App = {
   _renderRolesList() {
     const container = el('cfg-roles-list');
     if (!container) return;
-    const people = this._data?.ebanistas || [];
-    const roles  = Storage.getRoles();
+    const people      = this._data?.ebanistas || [];
+    const personasMap = this.buildPersonasMap(this._dbData);
 
     if (!people.length) {
       container.innerHTML = '<div class="cfg-hint">Sincroniza con ClickUp para ver el personal del dropdown EBANISTA.</div>';
@@ -144,12 +220,12 @@ const App = {
         <div class="role-radios">
           <label class="role-label">
             <input type="radio" name="role-${esc(name.replace(/\s/g,'_'))}" value="ebanista"
-              ${(roles[name] || 'ebanista') === 'ebanista' ? 'checked' : ''}>
+              ${(personasMap[name] || 'ebanista') === 'ebanista' ? 'checked' : ''}>
             Ebanista
           </label>
           <label class="role-label">
             <input type="radio" name="role-${esc(name.replace(/\s/g,'_'))}" value="pintor"
-              ${roles[name] === 'pintor' ? 'checked' : ''}>
+              ${personasMap[name] === 'pintor' ? 'checked' : ''}>
             Pintor
           </label>
         </div>
@@ -157,11 +233,20 @@ const App = {
     `).join('');
 
     container.querySelectorAll('input[type="radio"]').forEach(radio => {
-      radio.addEventListener('change', () => {
-        const raw  = radio.name.replace(/^role-/, '').replace(/_/g, ' ');
-        const name = people.find(p => p.replace(/\s/g,'_') === radio.name.replace(/^role-/,'')) || raw;
-        Storage.setRole(name, radio.value);
+      radio.addEventListener('change', async () => {
+        const safeName = radio.name.replace(/^role-/, '');
+        const name     = people.find(p => p.replace(/\s/g,'_') === safeName) || safeName.replace(/_/g,' ');
+        // Optimistic update local cache
+        const idx = this._dbData.personas.findIndex(p => p.nombre === name);
+        if (idx !== -1) this._dbData.personas[idx].tipo = radio.value;
+        else this._dbData.personas.push({ nombre: name, tipo: radio.value, activo: true });
         this._renderAll();
+        // Persist
+        try {
+          await DB.upsertPersona(name, radio.value);
+        } catch (e) {
+          console.error('[App] role save failed:', e.message);
+        }
       });
     });
   },
@@ -188,12 +273,13 @@ const App = {
     sel.innerHTML = '<option value="">— Persona —</option>' +
       people.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
 
-    // Pre-select the assigned person if set
-    const a = Storage.getAssignment(opId);
+    // Pre-select assigned person
+    const assignments = this.buildAssignments(this._dbData);
+    const a = assignments[opId];
     if (a?.person) sel.value = a.person;
 
-    el('complete-date').value    = todayIso();
-    el('complete-reproceso').checked = false;
+    el('complete-date').value         = todayIso();
+    el('complete-reproceso').checked  = false;
     el('complete-overlay').style.display = 'flex';
   },
 
@@ -202,7 +288,7 @@ const App = {
     this._pendingCompleteOp = null;
   },
 
-  _confirmComplete() {
+  async _confirmComplete() {
     const { opId, opName } = this._pendingCompleteOp || {};
     if (!opId) return;
 
@@ -213,28 +299,56 @@ const App = {
     if (!person)  { alert('Selecciona una persona'); return; }
     if (!dateVal) { alert('Ingresa una fecha'); return; }
 
-    const op         = this._data?.ops.find(o => o.id === opId);
+    const op          = this._data?.ops.find(o => o.id === opId);
     const completedAt = isoToDate(dateVal);
     const firstDate   = op ? firstActivityDate(op) : null;
     const daysInPlant = (firstDate && completedAt) ? daysBetween(firstDate, completedAt) : null;
 
-    Storage.addToProductionLog({
-      id:           opId,
-      name:         opName,
-      project:      op?.project || '',
-      client:       op?.client  || '',
-      nivel:        op?.nivel   ?? null,
-      person,
-      stage:        Storage.getAssignment(opId)?.stage || null,
-      completedDate: dateVal,
-      isReproceso,
-      daysInPlant,
+    const assignments = this.buildAssignments(this._dbData);
+    const stage       = assignments[opId]?.stage || null;
+
+    // Optimistic update: add to local produccion
+    this._dbData.produccion.unshift({
+      op_id: opId, nombre_op: opName, proyecto: op?.project || '',
+      persona: person, fecha_salida: dateVal,
+      es_reproceso: isReproceso, dias_en_planta: daysInPlant,
     });
 
-    Storage.removeAssignment(opId);
-    Storage.setPriority(Storage.getPriority().filter(id => id !== opId));
+    // Remove from local asignaciones
+    this._dbData.asignaciones = this._dbData.asignaciones.filter(a => a.op_id !== opId);
+
+    // Remove from local prioridades
+    this._dbData.prioridades = this._dbData.prioridades.filter(p => p.proyecto_id !== opId);
+
     this._closeCompleteModal();
     this._renderAll();
+
+    // Persist to Supabase
+    try {
+      await DB.addProduccion({
+        op_id:         opId,
+        nombre_op:     opName,
+        proyecto:      op?.project || '',
+        persona:       person,
+        fecha_salida:  dateVal,
+        es_reproceso:  isReproceso,
+        dias_en_planta: daysInPlant,
+      });
+      await DB.removeAsignacion(opId);
+    } catch (e) {
+      console.error('[App] complete save failed:', e.message);
+    }
+
+    // Mark complete in ClickUp (status = BODEGA)
+    try {
+      await PlantaAPI.markComplete(opId, 'BODEGA');
+      // Force ClickUp refresh so the OP disappears from active list
+      PlantaAPI.clearCache();
+      await this._sync({ force: true, silent: true });
+    } catch (e) {
+      console.warn('[App] ClickUp status update failed:', e.message);
+      // Non-fatal — OP will drop from list on next natural sync
+    }
   },
 };
 

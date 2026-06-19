@@ -220,6 +220,21 @@ const PlantaAPI = {
     };
   },
 
+  // ── Mark OP complete in ClickUp ──────────────────────────
+  async markComplete(opId, statusName = 'BODEGA') {
+    const apiKey = this.getApiKey();
+    const res = await fetch(`https://api.clickup.com/api/v2/task/${opId}`, {
+      method:  'PUT',
+      headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ status: statusName }),
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => res.status);
+      throw new Error(`ClickUp PUT ${res.status}: ${msg}`);
+    }
+    return res.json();
+  },
+
   // ── Main entry point ─────────────────────────────────────
   async fetchOPs({ force = false, onProgress } = {}) {
     const prog = msg => { if (onProgress) onProgress(msg); };

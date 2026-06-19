@@ -4,20 +4,20 @@
 
 const Panel = {
 
-  render({ ops, ebanistas }) {
-    const assignments = Storage.getAssignments();
-    const roles       = Storage.getRoles();
+  render({ ops, ebanistas, dbData }) {
+    const assignments = App.buildAssignments(dbData);
+    const personasMap = App.buildPersonasMap(dbData);
 
     // Build per-person data
     const personData = ebanistas.map(name => {
-      const role  = roles[name] || 'ebanista';
+      const role  = personasMap[name] || 'ebanista';
       const myOps = ops.filter(op => assignments[op.id]?.person === name);
       return { name, role, myOps };
     });
 
     const ebanistasData = personData.filter(p => p.role === 'ebanista');
     const pintoresData  = personData.filter(p => p.role === 'pintor');
-    const unknownData   = personData.filter(p => !roles[p.name]);
+    const unknownData   = personData.filter(p => !personasMap[p.name]);
 
     const unassignedOps = ops.filter(op => !assignments[op.id]?.person);
     const noWorkPeople  = personData.filter(p => p.myOps.length === 0);

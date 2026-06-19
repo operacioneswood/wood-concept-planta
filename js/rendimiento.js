@@ -5,9 +5,15 @@
 const Rendimiento = {
   _period: 'monthly',
 
-  render({ ebanistas }) {
-    const roles = Storage.getRoles();
-    const log   = Storage.getProductionLog();
+  render({ ebanistas, dbData }) {
+    const personasMap = App.buildPersonasMap(dbData);
+    const rawLog      = dbData?.produccion || [];
+    const log         = rawLog.map(r => ({
+      name:          r.nombre_op,
+      person:        r.persona,
+      completedDate: r.fecha_salida,
+      isReproceso:   r.es_reproceso,
+    }));
 
     // Controls
     el('rendimiento-controls').innerHTML = `
@@ -19,12 +25,12 @@ const Rendimiento = {
     el('rendimiento-controls').querySelectorAll('.rend-period-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         this._period = btn.dataset.period;
-        this.render({ ebanistas });
+        this.render({ ebanistas, dbData });
       });
     });
 
     // Filter log to current period
-    const now     = new Date();
+    const now      = new Date();
     const filtered = log.filter(e => {
       if (!e.completedDate) return false;
       const d = isoToDate(e.completedDate);
@@ -39,7 +45,7 @@ const Rendimiento = {
       }
     });
 
-    const people = ebanistas.length ? ebanistas : Object.keys(roles);
+    const people = ebanistas.length ? ebanistas : Object.keys(personasMap);
 
     if (!people.length) {
       el('rendimiento-body').innerHTML = '<div class="empty-state"><p>Sincroniza con ClickUp para ver el personal.</p></div>';
@@ -49,7 +55,7 @@ const Rendimiento = {
     el('rendimiento-body').innerHTML = `
       <div class="rend-period-label">${this._periodLabel(now)}</div>
       <div class="rend-grid">
-        ${people.map(name => this._renderPersonCard(name, roles[name] || 'ebanista', filtered)).join('')}
+        ${people.map(name => this._renderPersonCard(name, personasMap[name] || 'ebanista', filtered)).join('')}
       </div>
     `;
   },
