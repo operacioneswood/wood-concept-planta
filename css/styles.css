@@ -265,7 +265,7 @@ body {
 }
 .panel-table-head {
   display: grid;
-  grid-template-columns: 160px 1fr 120px 130px 1fr;
+  grid-template-columns: 180px 1fr;
   gap: 0; padding: 8px 16px;
   background: var(--divider);
   font-size: 11px; font-weight: 700;
@@ -274,21 +274,46 @@ body {
 }
 .panel-row {
   display: grid;
-  grid-template-columns: 160px 1fr 120px 130px 1fr;
+  grid-template-columns: 180px 1fr;
   gap: 0; padding: 10px 16px;
   border-top: 1px solid var(--divider);
-  align-items: center; font-size: 13px;
+  align-items: start; font-size: 13px;
   transition: background .1s;
 }
 .panel-row:hover { background: var(--bg); }
 .panel-row-alert { background: rgba(153,27,27,.03); }
 
-.panel-person { display: flex; align-items: center; gap: 7px; font-weight: 600; }
-.panel-task-name {
-  display: block; max-width: 280px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.panel-person {
+  display: flex; align-items: center; gap: 7px;
+  font-weight: 600; padding-top: 3px;
 }
-.panel-next { color: var(--muted); font-size: 12px; }
+.panel-op-count {
+  background: var(--border); color: var(--muted);
+  border-radius: 20px; padding: 1px 7px;
+  font-size: 11px; font-weight: 600;
+}
+.panel-tasks-col { display: flex; flex-direction: column; gap: 4px; }
+.panel-task-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--divider);
+  font-size: 13px;
+}
+.panel-task-row:last-child { border-bottom: none; }
+.panel-task-current .panel-task-name { font-weight: 600; }
+.panel-task-num {
+  min-width: 18px; height: 18px; border-radius: 50%;
+  background: var(--divider); color: var(--muted);
+  font-size: 10px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.panel-task-current .panel-task-num {
+  background: var(--text); color: #fff;
+}
+.panel-task-name {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* ════════════════════════════════════════════════════════════
    TABLERO TAB

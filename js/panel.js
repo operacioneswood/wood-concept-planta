@@ -64,10 +64,7 @@ const Panel = {
         <div class="panel-table">
           <div class="panel-table-head">
             <div>Persona</div>
-            <div>Tarea actual</div>
-            <div>Etapa</div>
-            <div>Estado ClickUp</div>
-            <div>Próxima tarea</div>
+            <div>Tareas asignadas</div>
           </div>
           ${people.map(p => this._renderRow(p, assignments)).join('')}
         </div>
@@ -76,21 +73,32 @@ const Panel = {
   },
 
   _renderRow({ name, myOps }, assignments) {
-    const noWork  = myOps.length === 0;
-    const current = myOps[0] || null;
-    const next    = myOps[1] || null;
-    const a       = current ? assignments[current.id] : null;
+    const noWork = myOps.length === 0;
+
+    const taskList = myOps.map((op, idx) => {
+      const a     = assignments[op.id];
+      const stage = a?.stage ? STAGE_LABELS[a.stage] : null;
+      const color = a?.stage ? STAGE_COLORS[a.stage] : null;
+      return `
+        <div class="panel-task-row ${idx === 0 ? 'panel-task-current' : ''}">
+          <span class="panel-task-num">${idx + 1}</span>
+          <span class="panel-task-name">${esc(op.name)}</span>
+          ${stage ? `<span class="stage-pill-sm" style="color:${color}">${esc(stage)}</span>` : ''}
+          ${this._statusBadge(op.status)}
+        </div>
+      `;
+    }).join('');
 
     return `
       <div class="panel-row ${noWork ? 'panel-row-alert' : ''}">
         <div class="panel-person">
           ${noWork ? '<span class="alert-dot-red"></span>' : ''}
           <span>${esc(name)}</span>
+          ${myOps.length > 0 ? `<span class="panel-op-count">${myOps.length}</span>` : ''}
         </div>
-        <div class="panel-task">${current ? `<span class="panel-task-name" title="${esc(current.name)}">${esc(current.name)}</span>` : '<span class="muted-txt">—</span>'}</div>
-        <div>${a?.stage ? `<span class="stage-pill" style="background:${STAGE_COLORS[a.stage]}22;color:${STAGE_COLORS[a.stage]};border-color:${STAGE_COLORS[a.stage]}55">${esc(STAGE_LABELS[a.stage])}</span>` : '<span class="muted-txt">—</span>'}</div>
-        <div>${current ? this._statusBadge(current.status) : '<span class="muted-txt">—</span>'}</div>
-        <div class="panel-next">${next ? `<span class="muted-txt" title="${esc(next.name)}">${esc(next.name)}</span>` : '<span class="muted-txt">—</span>'}</div>
+        <div class="panel-tasks-col">
+          ${noWork ? '<span class="muted-txt">Sin asignación</span>' : taskList}
+        </div>
       </div>
     `;
   },
