@@ -250,7 +250,20 @@ const Asignacion = {
           if (op) op[dateKey] = new Date();
 
           if (clearOnSuccess) {
-            // Etapa terminada → limpiar asignación para que se pueda asignar a la siguiente persona
+            // Guardar historial ANTES de limpiar (si no, el sync ya no encuentra la asignación)
+            const assignment = App._dbData.asignaciones.find(a => a.op_id === opId);
+            const person = assignment?.persona || row?.querySelector('.asign-person')?.value;
+            if (person) {
+              const today      = todayIso();
+              const inicioKey  = STAGE_INICIO[stage];
+              const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
+              const histEntry  = { op_id: opId, etapa: stage, persona: person, fecha_inicio: fechaInicio, fecha_fin: today, es_reproceso: false };
+              App._dbData.historial = (App._dbData.historial || []).filter(h => !(h.op_id === opId && h.etapa === stage));
+              App._dbData.historial.unshift(histEntry);
+              DB.upsertHistorial(histEntry).catch(e => console.warn('[Asignacion] historial:', e.message));
+            }
+
+            // Limpiar asignación para que el OP pueda asignarse a la siguiente persona
             const personSel = row?.querySelector('.asign-person');
             const stageSel  = row?.querySelector('.asign-stage');
             if (personSel) personSel.value = '';
