@@ -275,10 +275,15 @@ const Asignacion = {
           );
           DB.removeAsignacion(opId, person).catch(e => console.warn('[Asignacion] remove:', e.message));
 
-          // Set ClickUp fin date (last person wins)
-          await PlantaAPI.setField(opId, fieldId, Date.now());
-          if (op) op[dateKey] = new Date();
-          PlantaAPI.clearCache();
+          // Only set ClickUp fin date when nobody else is still in this stage
+          const othersInStage = App._dbData.asignaciones.filter(
+            a => a.op_id === opId && a.etapa === stage
+          );
+          if (othersInStage.length === 0) {
+            await PlantaAPI.setField(opId, fieldId, Date.now());
+            if (op) op[dateKey] = new Date();
+            PlantaAPI.clearCache();
+          }
 
           App.renderPanel();
           Proyectos.render({ ...App._data, dbData: App._dbData });
