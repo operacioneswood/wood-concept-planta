@@ -260,23 +260,40 @@ const PlantaAPI = {
     // Detect fields
     const { fieldIds, ebanistas } = this._detectFields(rawTasks);
 
-    // Build parent task map: id → name (tasks with parent === null are project headers)
-    const parentNameMap = {};
+    // Build a full node map for chain traversal: id → { name, parent }
+    const nodeMap = {};
     for (const t of rawTasks) {
-      if (!t.parent) parentNameMap[t.id] = t.name || '';
+      nodeMap[t.id] = { name: t.name || '', parent: t.parent || null };
     }
 
+    // Walk up the parent chain from a task until we reach a root task (parent === null).
+    // Returns the root task's name, or null if the chain breaks (parent not in nodeMap).
+    const findRootProject = id => {
+      const seen = new Set();
+      let cur = nodeMap[id];
+      while (cur) {
+        if (!cur.parent) return cur.name;   // this node is the root
+        if (seen.has(cur.parent)) return null; // cycle guard
+        seen.add(cur.parent);
+        cur = nodeMap[cur.parent];
+      }
+      return null; // parent not found in fetched tasks
+    };
+
     // Only subtasks (parent !== null) with an active status are OPs.
-    // Parent tasks are never shown as OPs — they exist only for grouping.
+    // Traverse the full chain to find the real root project name.
+    // Skip any OP whose root project cannot be identified.
     const ops = rawTasks
       .filter(t => t.parent && ACTIVE_STATUSES.has(normStr(t.status?.status || '')))
       .map(t => {
+        const rootProject = findRootProject(t.id);
+        if (!rootProject) return null;        // no identifiable root → discard
         const op = this._parseTask(t, fieldIds);
-        // Override project name with the parent task name (not folder/list)
-        op.project  = parentNameMap[t.parent] || op.project;
+        op.project  = rootProject;            // always the root task name
         op.parentId = t.parent;
         return op;
-      });
+      })
+      .filter(Boolean);
 
     prog(`${ops.length} OPs activos encontrados.`);
 
