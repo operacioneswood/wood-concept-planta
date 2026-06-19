@@ -187,7 +187,7 @@ const PlantaAPI = {
 
     const clientVal = getField(fieldIds.cliente);
     const client    = typeof clientVal === 'string' ? clientVal :
-                      (clientVal?.name || raw.folder?.name || '');
+                      (clientVal?.name || '');
 
     const causaRaw  = getField(fieldIds.causaReproceso);
     const causa     = typeof causaRaw === 'string' ? causaRaw :
