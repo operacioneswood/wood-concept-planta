@@ -260,10 +260,23 @@ const PlantaAPI = {
     // Detect fields
     const { fieldIds, ebanistas } = this._detectFields(rawTasks);
 
-    // Filter and parse
+    // Build parent task map: id → name (tasks with parent === null are project headers)
+    const parentNameMap = {};
+    for (const t of rawTasks) {
+      if (!t.parent) parentNameMap[t.id] = t.name || '';
+    }
+
+    // Only subtasks (parent !== null) with an active status are OPs.
+    // Parent tasks are never shown as OPs — they exist only for grouping.
     const ops = rawTasks
-      .filter(t => ACTIVE_STATUSES.has(normStr(t.status?.status || '')))
-      .map(t => this._parseTask(t, fieldIds));
+      .filter(t => t.parent && ACTIVE_STATUSES.has(normStr(t.status?.status || '')))
+      .map(t => {
+        const op = this._parseTask(t, fieldIds);
+        // Override project name with the parent task name (not folder/list)
+        op.project  = parentNameMap[t.parent] || op.project;
+        op.parentId = t.parent;
+        return op;
+      });
 
     prog(`${ops.length} OPs activos encontrados.`);
 

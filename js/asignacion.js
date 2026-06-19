@@ -1,45 +1,79 @@
 // ─────────────────────────────────────────────────────────────
 // js/asignacion.js — Asignación tab: assign person+stage to OPs
+//                    OPs grouped by parent project
 // ─────────────────────────────────────────────────────────────
 
 const Asignacion = {
+  _collapsed: new Set(),
 
   render({ ops, ebanistas }) {
-    const assignments = Storage.getAssignments();
-
     const body = el('asignacion-body');
+
     if (!ops.length) {
       body.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Sin OPs activos para asignar.</p></div>';
       return;
     }
 
+    const assignments = Storage.getAssignments();
     const priority    = Storage.getPriority();
-    const sortedOps   = [
-      ...priority.map(id => ops.find(o => o.id === id)).filter(Boolean),
-      ...ops.filter(o => !priority.includes(o.id)),
-    ];
 
-    body.innerHTML = `
-      <div class="asign-table">
-        <div class="asign-table-head">
-          <div>OP / Tarea</div>
-          <div>Proyecto</div>
-          <div>Etapa actual</div>
-          <div>Persona</div>
-          <div>Etapa asignada</div>
-          <div>Fecha estimada</div>
-          <div>Acciones</div>
+    // Group by project, preserving priority order within each group
+    const groups = this._groupByProject(ops, priority);
+
+    body.innerHTML = [...groups.entries()].map(([proj, projOps]) =>
+      this._renderGroup(proj, projOps, assignments, ebanistas)
+    ).join('');
+
+    this._bindEvents(ops, ebanistas);
+  },
+
+  _groupByProject(ops, priority) {
+    // Sort ops by priority within each project
+    const priorityIdx = id => { const i = priority.indexOf(id); return i === -1 ? 999 : i; };
+    const map = new Map();
+    for (const op of ops) {
+      const key = op.project || '(Sin proyecto)';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(op);
+    }
+    for (const [, arr] of map) arr.sort((a, b) => priorityIdx(a.id) - priorityIdx(b.id));
+    return map;
+  },
+
+  _renderGroup(projName, projOps, assignments, ebanistas) {
+    const collapsed    = this._collapsed.has(projName);
+    const safeId       = 'ag-' + projName.replace(/[^a-zA-Z0-9]/g, '_');
+    const assignedCount = projOps.filter(op => assignments[op.id]?.person).length;
+
+    return `
+      <div class="proj-group asign-group" data-proj="${esc(projName)}">
+        <div class="proj-group-hdr asign-group-hdr" data-group="${safeId}">
+          <span class="proj-group-arrow">${collapsed ? '▶' : '▼'}</span>
+          <span class="proj-group-name">${esc(projName)}</span>
+          <span class="proj-group-count">${projOps.length} OP${projOps.length !== 1 ? 's' : ''}</span>
+          <span class="asign-group-assigned">${assignedCount}/${projOps.length} asignados</span>
         </div>
-        ${sortedOps.map(op => this._renderRow(op, assignments, ebanistas)).join('')}
+        <div class="asign-group-body ${collapsed ? 'proj-group-collapsed' : ''}" id="${safeId}">
+          <div class="asign-table">
+            <div class="asign-table-head">
+              <div>OP / Tarea</div>
+              <div>Etapa actual</div>
+              <div>Persona</div>
+              <div>Etapa asignada</div>
+              <div>Fecha estimada</div>
+              <div>Acciones</div>
+            </div>
+            ${projOps.map(op => this._renderRow(op, assignments, ebanistas)).join('')}
+          </div>
+        </div>
       </div>
     `;
-
-    this._bindEvents(sortedOps, ebanistas);
   },
 
   _renderRow(op, assignments, ebanistas) {
     const a     = assignments[op.id];
     const stage = getCurrentStage(op);
+    const hasReproceso = !!op.inicioReproceso && !op.finReproceso;
 
     const personOptions = ebanistas.map(name =>
       `<option value="${esc(name)}" ${a?.person === name ? 'selected' : ''}>${esc(name)}</option>`
@@ -51,17 +85,16 @@ const Asignacion = {
       `<option value="reproceso" ${a?.stage === 'reproceso' ? 'selected' : ''}>Reproceso</option>`,
     ].join('');
 
-    const hasReproceso = !!op.inicioReproceso && !op.finReproceso;
-
     return `
       <div class="asign-row ${a?.person ? 'asign-row-assigned' : 'asign-row-empty'}" data-op-id="${esc(op.id)}">
         <div class="asign-name">
           ${esc(op.name)}
           ${hasReproceso ? '<span class="badge-reproceso-sm">Reproceso</span>' : ''}
         </div>
-        <div class="muted-txt asign-project">${esc(op.project || '—')}</div>
         <div>
-          ${stage ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>` : '<span class="muted-txt">—</span>'}
+          ${stage
+            ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>`
+            : '<span class="muted-txt">—</span>'}
         </div>
         <div>
           <select class="asign-select asign-person" data-op="${esc(op.id)}">
@@ -78,14 +111,35 @@ const Asignacion = {
           <input type="date" class="asign-date" data-op="${esc(op.id)}" value="${a?.estimatedDate || ''}">
         </div>
         <div class="asign-actions">
-          <button class="btn-save-asign btn-primary btn-sm" data-op="${esc(op.id)}" title="Guardar asignación">✓</button>
-          <button class="btn-complete-op btn-secondary btn-sm" data-op="${esc(op.id)}" data-name="${esc(op.name)}" title="Marcar como completado">✔ Listo</button>
+          <button class="btn-save-asign btn-primary btn-sm" data-op="${esc(op.id)}">✓</button>
+          <button class="btn-complete-op btn-secondary btn-sm" data-op="${esc(op.id)}" data-name="${esc(op.name)}">✔ Listo</button>
         </div>
       </div>
     `;
   },
 
   _bindEvents(ops, ebanistas) {
+    // Collapse/expand groups
+    document.querySelectorAll('.asign-group-hdr').forEach(hdr => {
+      hdr.addEventListener('click', e => {
+        if (e.target.closest('select, input, button')) return;
+        const proj   = hdr.closest('.asign-group').dataset.proj;
+        const bodyId = hdr.dataset.group;
+        const body   = el(bodyId);
+        const arrow  = hdr.querySelector('.proj-group-arrow');
+        if (!body) return;
+        if (this._collapsed.has(proj)) {
+          this._collapsed.delete(proj);
+          body.classList.remove('proj-group-collapsed');
+          if (arrow) arrow.textContent = '▼';
+        } else {
+          this._collapsed.add(proj);
+          body.classList.add('proj-group-collapsed');
+          if (arrow) arrow.textContent = '▶';
+        }
+      });
+    });
+
     // Save assignment
     document.querySelectorAll('.btn-save-asign').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -95,16 +149,15 @@ const Asignacion = {
         const person        = row.querySelector('.asign-person').value;
         const stage         = row.querySelector('.asign-stage').value;
         const estimatedDate = row.querySelector('.asign-date').value;
-
-        if (person || stage) {
-          Storage.setAssignment(opId, { person, stage, estimatedDate });
-          row.classList.toggle('asign-row-assigned', !!person);
-          row.classList.toggle('asign-row-empty', !person);
-          btn.textContent = '✓ Guardado';
-          btn.style.background = '#166534';
-          setTimeout(() => { btn.textContent = '✓'; btn.style.background = ''; }, 1500);
-          App.renderPanel();
-        }
+        Storage.setAssignment(opId, { person, stage, estimatedDate });
+        row.classList.toggle('asign-row-assigned', !!person);
+        row.classList.toggle('asign-row-empty', !person);
+        btn.textContent = '✓ Guardado';
+        btn.style.background = '#166534';
+        setTimeout(() => { btn.textContent = '✓'; btn.style.background = ''; }, 1500);
+        App.renderPanel();
+        // Update assigned count in header
+        this._updateGroupCount(row, opId);
       });
     });
 
@@ -125,8 +178,20 @@ const Asignacion = {
         const stage         = row.querySelector('.asign-stage').value;
         const estimatedDate = row.querySelector('.asign-date').value;
         Storage.setAssignment(opId, { person, stage, estimatedDate });
+        row.classList.toggle('asign-row-assigned', !!person);
+        row.classList.toggle('asign-row-empty', !person);
         App.renderPanel();
+        this._updateGroupCount(row, opId);
       });
     });
+  },
+
+  _updateGroupCount(row, opId) {
+    const group    = row.closest('.asign-group');
+    if (!group) return;
+    const allRows  = group.querySelectorAll('.asign-row');
+    const assigned = group.querySelectorAll('.asign-row-assigned').length;
+    const counter  = group.querySelector('.asign-group-assigned');
+    if (counter) counter.textContent = `${assigned}/${allRows.length} asignados`;
   },
 };

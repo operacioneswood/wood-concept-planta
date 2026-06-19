@@ -365,6 +365,40 @@ body {
 .prod-log-meta { display: flex; gap: 10px; font-size: 11px; color: var(--muted); flex-wrap: wrap; }
 
 /* ════════════════════════════════════════════════════════════
+   PROJECT GROUP HEADERS (shared by Proyectos + Asignación)
+   ════════════════════════════════════════════════════════════ */
+.proj-group { margin-bottom: 8px; }
+
+.proj-group-hdr {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--r); cursor: pointer;
+  user-select: none; transition: background .1s;
+}
+.proj-group-hdr:hover { background: var(--divider); }
+
+.proj-group-arrow { color: var(--faint); font-size: 11px; flex-shrink: 0; }
+.proj-group-name  { font-size: 14px; font-weight: 700; flex: 1; }
+.proj-group-count {
+  font-size: 11px; font-weight: 600;
+  background: var(--divider); color: var(--muted);
+  border-radius: 10px; padding: 1px 8px;
+}
+
+.proj-group-body { padding: 4px 0 4px 12px; }
+.proj-group-collapsed { display: none; }
+
+.asign-group-assigned {
+  font-size: 11px; color: var(--green); font-weight: 600;
+  margin-left: auto;
+}
+.asign-group .proj-group-hdr { border-radius: var(--r) var(--r) 0 0; }
+.asign-group .asign-group-body { padding: 0; }
+.asign-group .asign-table { border-radius: 0 0 var(--r) var(--r); border-top: none; }
+.asign-group { margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--r); }
+
+/* ════════════════════════════════════════════════════════════
    PROYECTOS TAB
    ════════════════════════════════════════════════════════════ */
 .proj-card {
@@ -475,7 +509,7 @@ body {
 }
 .asign-table-head {
   display: grid;
-  grid-template-columns: 1fr 120px 110px 140px 130px 130px 130px;
+  grid-template-columns: 1fr 110px 140px 130px 130px 145px;
   padding: 8px 14px;
   background: var(--divider); gap: 10px;
   font-size: 11px; font-weight: 700;
@@ -484,7 +518,7 @@ body {
 }
 .asign-row {
   display: grid;
-  grid-template-columns: 1fr 120px 110px 140px 130px 130px 130px;
+  grid-template-columns: 1fr 110px 140px 130px 130px 145px;
   padding: 10px 14px; gap: 10px;
   border-top: 1px solid var(--divider);
   align-items: center; font-size: 13px;

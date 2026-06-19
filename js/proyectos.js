@@ -1,19 +1,23 @@
 // ─────────────────────────────────────────────────────────────
-// js/proyectos.js — Proyectos tab: OP cards with progress
+// js/proyectos.js — Proyectos tab: OPs grouped by parent project
 // ─────────────────────────────────────────────────────────────
 
 const Proyectos = {
+  _collapsed: new Set(),   // set of project names currently collapsed
 
   render({ ops }) {
     const log          = Storage.getProductionLog();
     const contratistas = Storage.getContratistas();
+    const body         = el('proyectos-body');
 
-    const body = el('proyectos-body');
     if (!ops.length) {
       body.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><p>Sin OPs activos en planta.</p></div>';
     } else {
-      body.innerHTML = ops.map(op => this._renderCard(op, contratistas)).join('');
-      this._bindContratista(ops, contratistas);
+      const groups = this._groupByProject(ops);
+      body.innerHTML = [...groups.entries()].map(([proj, projOps]) =>
+        this._renderGroup(proj, projOps, contratistas)
+      ).join('');
+      this._bindEvents(ops, contratistas);
     }
 
     // Completed table
@@ -28,15 +32,43 @@ const Proyectos = {
     }
   },
 
+  _groupByProject(ops) {
+    const map = new Map();
+    for (const op of ops) {
+      const key = op.project || '(Sin proyecto)';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(op);
+    }
+    return map;
+  },
+
+  _renderGroup(projName, projOps, contratistas) {
+    const collapsed   = this._collapsed.has(projName);
+    const safeId      = projName.replace(/[^a-zA-Z0-9]/g, '_');
+    const anyRepro    = projOps.some(op => !!op.inicioReproceso && !op.finReproceso);
+
+    return `
+      <div class="proj-group" data-proj="${esc(projName)}">
+        <div class="proj-group-hdr" data-proj="${esc(projName)}">
+          <span class="proj-group-arrow">${collapsed ? '▶' : '▼'}</span>
+          <span class="proj-group-name">${esc(projName)}</span>
+          ${anyRepro ? '<span class="badge-reproceso-sm">⚠ Reproceso</span>' : ''}
+          <span class="proj-group-count">${projOps.length} OP${projOps.length !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="proj-group-body ${collapsed ? 'proj-group-collapsed' : ''}" id="proj-body-${safeId}">
+          ${projOps.map(op => this._renderCard(op, contratistas)).join('')}
+        </div>
+      </div>
+    `;
+  },
+
   _renderCard(op, contratistas) {
-    const stage         = getCurrentStage(op);
-    const completed     = countCompletedStages(op);
-    const pct           = Math.round((completed / STAGES.length) * 100);
-    const firstDate     = firstActivityDate(op);
-    const daysInPlant   = firstDate ? daysSince(firstDate) : null;
-    const daysInStage   = stage && op[STAGE_INICIO[stage]] ? daysSince(op[STAGE_INICIO[stage]]) : null;
-    const hasReproceso  = !!op.inicioReproceso && !op.finReproceso;
-    const ct            = contratistas[op.id];
+    const stage        = getCurrentStage(op);
+    const firstDate    = firstActivityDate(op);
+    const daysInPlant  = firstDate ? daysSince(firstDate) : null;
+    const daysInStage  = stage && op[STAGE_INICIO[stage]] ? daysSince(op[STAGE_INICIO[stage]]) : null;
+    const hasReproceso = !!op.inicioReproceso && !op.finReproceso;
+    const ct           = contratistas[op.id];
 
     return `
       <div class="proj-card" data-op-id="${esc(op.id)}">
@@ -49,9 +81,8 @@ const Proyectos = {
         </div>
 
         <div class="proj-card-meta">
-          ${op.project ? `<span class="proj-meta-item">📁 ${esc(op.project)}</span>` : ''}
-          ${op.client  ? `<span class="proj-meta-item">👤 ${esc(op.client)}</span>` : ''}
-          ${op.nivel   ? `<span class="proj-meta-item">💰 ${op.nivel.toLocaleString('es-MX')}</span>` : ''}
+          ${op.client      ? `<span class="proj-meta-item">👤 ${esc(op.client)}</span>` : ''}
+          ${op.nivel       ? `<span class="proj-meta-item">💰 ${op.nivel.toLocaleString('es-MX')}</span>` : ''}
           ${daysInPlant !== null ? `<span class="proj-meta-item">🕐 ${daysInPlant}d en planta</span>` : ''}
           ${stage && daysInStage !== null ? `<span class="proj-meta-item proj-stage-days">⏱ ${daysInStage}d en ${esc(STAGE_LABELS[stage])}</span>` : ''}
         </div>
@@ -59,9 +90,9 @@ const Proyectos = {
         <div class="proj-progress">
           <div class="proj-progress-bar">
             ${STAGES.map(s => {
-              const done    = !!op[STAGE_FIN[s.id]];
-              const active  = s.id === stage;
-              const cls     = done ? 'stage-seg-done' : active ? 'stage-seg-active' : 'stage-seg-empty';
+              const done   = !!op[STAGE_FIN[s.id]];
+              const active = s.id === stage;
+              const cls    = done ? 'stage-seg-done' : active ? 'stage-seg-active' : 'stage-seg-empty';
               return `<div class="stage-seg ${cls}" style="${done || active ? `background:${s.color}` : ''}" title="${s.label}${done ? ' ✓' : active ? ' (en curso)' : ''}"></div>`;
             }).join('')}
           </div>
@@ -87,45 +118,27 @@ const Proyectos = {
 
         <div class="proj-card-footer">
           <button class="btn-contratista ${ct ? 'active' : ''}" data-op="${esc(op.id)}">
-            ${ct ? '🔧 Contratista: ' + esc(ct.name) : '+ Contratista'}
+            ${ct ? '🔧 ' + esc(ct.name || 'Contratista') : '+ Contratista'}
           </button>
         </div>
 
-        ${ct ? `
-          <div class="contratista-panel" id="ct-panel-${esc(op.id)}">
-            <div class="ct-fields">
-              <div class="ct-field">
-                <label class="ct-label">Nombre</label>
-                <input class="ct-input" data-op="${esc(op.id)}" data-key="name" value="${esc(ct.name || '')}" placeholder="Nombre contratista">
-              </div>
-              <div class="ct-field">
-                <label class="ct-label">Fecha prometida</label>
-                <input type="date" class="ct-input" data-op="${esc(op.id)}" data-key="fechaPrometida" value="${ct.fechaPrometida || ''}">
-              </div>
-              <div class="ct-field">
-                <label class="ct-label">Fecha real</label>
-                <input type="date" class="ct-input" data-op="${esc(op.id)}" data-key="fechaReal" value="${ct.fechaReal || ''}">
-              </div>
-              <button class="btn-secondary btn-sm ct-remove" data-op="${esc(op.id)}">Quitar</button>
-            </div>
-          </div>
-        ` : `<div class="contratista-panel" id="ct-panel-${esc(op.id)}" style="display:none">
+        <div class="contratista-panel" id="ct-panel-${esc(op.id)}" ${ct ? '' : 'style="display:none"'}>
           <div class="ct-fields">
             <div class="ct-field">
               <label class="ct-label">Nombre</label>
-              <input class="ct-input" data-op="${esc(op.id)}" data-key="name" placeholder="Nombre contratista">
+              <input class="ct-input" data-op="${esc(op.id)}" data-key="name" value="${esc(ct?.name || '')}" placeholder="Nombre contratista">
             </div>
             <div class="ct-field">
               <label class="ct-label">Fecha prometida</label>
-              <input type="date" class="ct-input" data-op="${esc(op.id)}" data-key="fechaPrometida">
+              <input type="date" class="ct-input" data-op="${esc(op.id)}" data-key="fechaPrometida" value="${ct?.fechaPrometida || ''}">
             </div>
             <div class="ct-field">
               <label class="ct-label">Fecha real</label>
-              <input type="date" class="ct-input" data-op="${esc(op.id)}" data-key="fechaReal">
+              <input type="date" class="ct-input" data-op="${esc(op.id)}" data-key="fechaReal" value="${ct?.fechaReal || ''}">
             </div>
             <button class="btn-secondary btn-sm ct-remove" data-op="${esc(op.id)}">Quitar</button>
           </div>
-        </div>`}
+        </div>
       </div>
     `;
   },
@@ -135,13 +148,8 @@ const Proyectos = {
       <table class="completed-table">
         <thead>
           <tr>
-            <th>OP / Tarea</th>
-            <th>Proyecto</th>
-            <th>Persona</th>
-            <th>Nivel</th>
-            <th>Días planta</th>
-            <th>Completado</th>
-            <th>Tipo</th>
+            <th>OP / Tarea</th><th>Proyecto</th><th>Persona</th>
+            <th>Nivel</th><th>Días planta</th><th>Completado</th><th>Tipo</th>
           </tr>
         </thead>
         <tbody>
@@ -150,8 +158,8 @@ const Proyectos = {
               <td>${esc(e.name)}</td>
               <td class="muted-txt">${esc(e.project || '—')}</td>
               <td>${esc(e.person || '—')}</td>
-              <td>${e.nivel !== null && e.nivel !== undefined ? e.nivel.toLocaleString('es-MX') : '—'}</td>
-              <td>${e.daysInPlant !== null && e.daysInPlant !== undefined ? e.daysInPlant + 'd' : '—'}</td>
+              <td>${e.nivel != null ? e.nivel.toLocaleString('es-MX') : '—'}</td>
+              <td>${e.daysInPlant != null ? e.daysInPlant + 'd' : '—'}</td>
               <td class="muted-txt">${esc(e.completedDate || '—')}</td>
               <td>${e.isReproceso ? '<span class="badge-reproceso-sm">Reproceso</span>' : '<span class="badge-normal">Normal</span>'}</td>
             </tr>
@@ -161,11 +169,31 @@ const Proyectos = {
     `;
   },
 
-  _bindContratista(ops, contratistas) {
-    // Toggle button
+  _bindEvents(ops, contratistas) {
+    // Collapse/expand project groups
+    document.querySelectorAll('.proj-group-hdr').forEach(hdr => {
+      hdr.addEventListener('click', () => {
+        const proj   = hdr.dataset.proj;
+        const safeId = proj.replace(/[^a-zA-Z0-9]/g, '_');
+        const body   = el(`proj-body-${safeId}`);
+        const arrow  = hdr.querySelector('.proj-group-arrow');
+        if (!body) return;
+        if (this._collapsed.has(proj)) {
+          this._collapsed.delete(proj);
+          body.classList.remove('proj-group-collapsed');
+          if (arrow) arrow.textContent = '▼';
+        } else {
+          this._collapsed.add(proj);
+          body.classList.add('proj-group-collapsed');
+          if (arrow) arrow.textContent = '▶';
+        }
+      });
+    });
+
+    // Contratista toggle
     document.querySelectorAll('.btn-contratista').forEach(btn => {
       btn.addEventListener('click', () => {
-        const opId = btn.dataset.op;
+        const opId  = btn.dataset.op;
         const panel = el(`ct-panel-${opId}`);
         if (!panel) return;
         const visible = panel.style.display !== 'none';
@@ -176,7 +204,7 @@ const Proyectos = {
       });
     });
 
-    // Input save (debounced)
+    // Contratista fields auto-save
     document.querySelectorAll('.ct-input').forEach(input => {
       input.addEventListener('change', () => {
         const opId = input.dataset.op;
@@ -187,11 +215,10 @@ const Proyectos = {
       });
     });
 
-    // Remove
+    // Remove contratista
     document.querySelectorAll('.ct-remove').forEach(btn => {
       btn.addEventListener('click', () => {
-        const opId = btn.dataset.op;
-        Storage.setContratista(opId, null);
+        Storage.setContratista(btn.dataset.op, null);
         App.rerender();
       });
     });
