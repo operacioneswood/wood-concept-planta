@@ -553,8 +553,9 @@ body {
 .asign-row-assigned { border-left: 3px solid var(--green); }
 .asign-row-empty    { border-left: 3px solid transparent; }
 
-.asign-name    { font-weight: 600; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.asign-project { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.asign-name     { font-weight: 600; display: flex; flex-direction: column; gap: 2px; }
+.asign-proj-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
+.asign-project  { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .asign-select {
   width: 100%; border: 1px solid var(--border);
@@ -666,8 +667,9 @@ body {
   display: flex; justify-content: space-between; gap: 8px;
   font-size: 12px;
 }
-.rend-log-repro { color: var(--amber); font-weight: 500; }
-.rend-log-more  { font-size: 12px; margin-top: 4px; }
+.rend-log-repro  { color: var(--amber); font-weight: 500; }
+.rend-log-stage  { font-size: 10px; color: var(--muted); background: var(--divider); border-radius: 3px; padding: 1px 4px; margin-left: 4px; }
+.rend-log-more   { font-size: 12px; margin-top: 4px; }
 .rend-empty     { font-size: 12px; }
 
 /* ════════════════════════════════════════════════════════════

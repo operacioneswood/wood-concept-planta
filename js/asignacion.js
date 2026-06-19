@@ -88,6 +88,7 @@ const Asignacion = {
       <div class="asign-row ${a?.person ? 'asign-row-assigned' : 'asign-row-empty'}" data-op-id="${esc(op.id)}">
         <div class="asign-name">
           ${esc(op.name)}
+          ${op.project ? `<div class="asign-proj-sub">${esc(op.project)}</div>` : ''}
           ${hasReproceso ? '<span class="badge-reproceso-sm">Reproceso</span>' : ''}
         </div>
         <div>
@@ -218,22 +219,23 @@ const Asignacion = {
   },
 
   _bindStageDates(fieldIds) {
-    this._bindStageDateBtn('.btn-stage-inicio', STAGE_INICIO);
-    this._bindStageDateBtn('.btn-stage-fin',    STAGE_FIN);
+    this._bindStageDateBtn('.btn-stage-inicio', STAGE_INICIO, fieldIds, false);
+    this._bindStageDateBtn('.btn-stage-fin',    STAGE_FIN,    fieldIds, true);
   },
 
-  _bindStageDateBtn(selector, stageMap) {
+  // clearOnSuccess=true → clear assignment after Fin so OP can be reassigned to next person
+  _bindStageDateBtn(selector, stageMap, fieldIds, clearOnSuccess) {
     document.querySelectorAll(selector).forEach(btn => {
       btn.addEventListener('click', async () => {
-        const opId = btn.dataset.op;
-        const row  = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
+        const opId  = btn.dataset.op;
+        const row   = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
         const stage = row?.querySelector('.asign-stage')?.value;
 
         if (!stage || stage === '_' || stage === 'reproceso') {
           alert('Selecciona una etapa válida primero'); return;
         }
 
-        const dateKey = stageMap[stage];           // e.g. 'inicioCorte'
+        const dateKey = stageMap[stage];
         const fieldId = fieldIds?.[dateKey];
         if (!fieldId) { alert('Campo de fecha no encontrado en ClickUp'); return; }
 
@@ -242,9 +244,23 @@ const Asignacion = {
 
         try {
           await PlantaAPI.setField(opId, fieldId, Date.now());
-          // Update local OP so Proyectos bar refreshes immediately
           const op = App._data?.ops.find(o => o.id === opId);
           if (op) op[dateKey] = new Date();
+
+          if (clearOnSuccess) {
+            // Etapa terminada → limpiar asignación para que se pueda asignar a la siguiente persona
+            const personSel = row?.querySelector('.asign-person');
+            const stageSel  = row?.querySelector('.asign-stage');
+            if (personSel) personSel.value = '';
+            if (stageSel)  stageSel.value  = '';
+            row?.classList.remove('asign-row-assigned');
+            row?.classList.add('asign-row-empty');
+            this._updateGroupCount(row);
+            App._dbData.asignaciones = App._dbData.asignaciones.filter(a => a.op_id !== opId);
+            App.renderPanel();
+            DB.removeAsignacion(opId).catch(e => console.warn('[Asignacion] remove:', e.message));
+          }
+
           PlantaAPI.clearCache();
           Proyectos.render({ ...App._data, dbData: App._dbData });
           btn.textContent = '✓'; btn.style.color = 'var(--green)';

@@ -7,7 +7,7 @@
 const Rendimiento = {
   _period: 'monthly',
 
-  render({ ebanistas, dbData }) {
+  render({ ebanistas, dbData, ops }) {
     const personasMap    = App.buildPersonasMap(dbData);
     const historial      = dbData?.historial  || [];
     const produccion     = dbData?.produccion || [];
@@ -64,7 +64,7 @@ const Rendimiento = {
           <span class="rend-section-sub">por etapa completada</span>
         </div>
         <div class="rend-grid">
-          ${ebanistasData.map(name => this._cardHistorial(name, 'ebanista', filteredHistorial)).join('')}
+          ${ebanistasData.map(name => this._cardHistorial(name, 'ebanista', filteredHistorial, ops || [])).join('')}
         </div>
       `);
     }
@@ -100,7 +100,7 @@ const Rendimiento = {
   },
 
   // Ebanistas: each row in historial with fecha_fin = 1 etapa completed
-  _cardHistorial(name, role, filteredHistorial) {
+  _cardHistorial(name, role, filteredHistorial, ops) {
     const target    = TARGETS[role] || TARGETS.ebanista;
     const meta      = this._period === 'weekly' ? target.weekly : target.monthly;
     const myRows    = filteredHistorial.filter(r => r.persona === name);
@@ -138,12 +138,17 @@ const Rendimiento = {
         </div>
         ${myRows.length > 0 ? `
           <div class="rend-log-preview">
-            ${myRows.slice(0, 4).map(r => `
+            ${myRows.slice(0, 4).map(r => {
+              const opName = ops.find(o => o.id === r.op_id)?.name || r.op_id;
+              return `
               <div class="rend-log-item">
-                <span class="${r.es_reproceso ? 'rend-log-repro' : ''}">${esc(STAGE_LABELS[r.etapa] || r.etapa)}</span>
+                <span class="${r.es_reproceso ? 'rend-log-repro' : ''}">
+                  ${esc(opName)}
+                  <span class="rend-log-stage">${esc(STAGE_LABELS[r.etapa] || r.etapa)}</span>
+                </span>
                 <span class="muted-txt">${esc(r.fecha_fin || '')}</span>
-              </div>
-            `).join('')}
+              </div>`;
+            }).join('')}
             ${myRows.length > 4 ? `<div class="muted-txt rend-log-more">+${myRows.length - 4} más</div>` : ''}
           </div>
         ` : '<div class="muted-txt rend-empty">Sin etapas completadas en este período</div>'}
