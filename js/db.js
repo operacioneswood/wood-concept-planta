@@ -42,23 +42,27 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
-  // ASIGNACIONES  (op_id + etapa = unique)
+  // ASIGNACIONES  (op_id + etapa + persona = unique)
   // ════════════════════════════════════════════════════════
   async getAsignaciones() {
     return this._q(sb => sb.from('asignaciones').select('*'));
   },
 
-  async setAsignacion(op_id, etapa, persona, fecha_asignacion = null) {
-    // Delete any previous rows for this op (one assignment per OP)
-    await this._sb.from('asignaciones').delete().eq('op_id', op_id);
-    return this._q(sb => sb.from('asignaciones').insert(
-      { op_id, etapa, persona, fecha_asignacion: fecha_asignacion || new Date().toISOString().slice(0,10) }
+  async setAsignacion(op_id, etapa, persona, fecha_asignacion = null, comentario = null) {
+    // Upsert by (op_id, etapa, persona) — allows multiple people per OP
+    return this._q(sb => sb.from('asignaciones').upsert(
+      { op_id, etapa, persona,
+        fecha_asignacion: fecha_asignacion || new Date().toISOString().slice(0, 10),
+        comentario: comentario ?? null,
+      },
+      { onConflict: 'op_id,etapa,persona' }
     ));
   },
 
-  async removeAsignacion(op_id, etapa = null) {
-    const q = this._sb.from('asignaciones').delete().eq('op_id', op_id);
-    const { error } = etapa ? await q.eq('etapa', etapa) : await q;
+  async removeAsignacion(op_id, persona = null) {
+    let q = this._sb.from('asignaciones').delete().eq('op_id', op_id);
+    if (persona) q = q.eq('persona', persona);
+    const { error } = await q;
     if (error) throw error;
   },
 
@@ -69,10 +73,10 @@ const DB = {
     return this._q(sb => sb.from('historial').select('*').order('fecha_fin', { ascending: false }));
   },
 
-  async upsertHistorial({ op_id, etapa, persona, fecha_inicio, fecha_fin, es_reproceso }) {
+  async upsertHistorial({ op_id, etapa, persona, fecha_inicio, fecha_fin, es_reproceso, comentario }) {
     return this._q(sb => sb.from('historial').upsert(
-      { op_id, etapa, persona, fecha_inicio, fecha_fin, es_reproceso: !!es_reproceso },
-      { onConflict: 'op_id,etapa' }
+      { op_id, etapa, persona, fecha_inicio, fecha_fin, es_reproceso: !!es_reproceso, comentario: comentario ?? null },
+      { onConflict: 'op_id,etapa,persona' }
     ));
   },
 

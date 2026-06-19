@@ -22,7 +22,7 @@ const Rendimiento = {
     el('rendimiento-controls').querySelectorAll('.rend-period-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         this._period = btn.dataset.period;
-        this.render({ ebanistas, dbData });
+        this.render({ ebanistas, dbData, ops });
       });
     });
 
@@ -97,6 +97,18 @@ const Rendimiento = {
       <div class="rend-period-label">${this._periodLabel(now)}</div>
       ${sections.join('')}
     `;
+
+    // Bind comment expand buttons
+    el('rendimiento-body').querySelectorAll('.btn-rend-expand').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const entry = btn.closest('.rend-log-entry');
+        const box   = entry?.querySelector('.rend-comment-box');
+        if (!box) return;
+        const open = box.style.display !== 'none';
+        box.style.display = open ? 'none' : 'block';
+        btn.textContent = open ? '💬' : '✕';
+      });
+    });
   },
 
   // Ebanistas: each row in historial with fecha_fin = 1 etapa completed
@@ -142,12 +154,18 @@ const Rendimiento = {
               const opData  = ops.find(o => o.id === r.op_id);
               const opLabel = opData?.noOp || opData?.name || r.op_id;
               return `
-              <div class="rend-log-item">
-                <span class="${r.es_reproceso ? 'rend-log-repro' : ''}">
-                  ${esc(opLabel)}
-                  <span class="rend-log-stage">${esc(STAGE_LABELS[r.etapa] || r.etapa)}</span>
-                </span>
-                <span class="muted-txt">${esc(r.fecha_fin || '')}</span>
+              <div class="rend-log-entry">
+                <div class="rend-log-item">
+                  <span class="${r.es_reproceso ? 'rend-log-repro' : ''}">
+                    ${esc(opLabel)}
+                    <span class="rend-log-stage">${esc(STAGE_LABELS[r.etapa] || r.etapa)}</span>
+                  </span>
+                  <div class="rend-log-right">
+                    <span class="muted-txt">${esc(r.fecha_fin || '')}</span>
+                    ${r.comentario ? `<button class="btn-rend-expand" title="Ver comentario">💬</button>` : ''}
+                  </div>
+                </div>
+                ${r.comentario ? `<div class="rend-comment-box" style="display:none">${esc(r.comentario)}</div>` : ''}
               </div>`;
             }).join('')}
             ${myRows.length > 4 ? `<div class="muted-txt rend-log-more">+${myRows.length - 4} más</div>` : ''}

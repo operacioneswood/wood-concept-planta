@@ -12,8 +12,8 @@ const App = {
   buildAssignments(dbData) {
     const map = {};
     for (const row of (dbData?.asignaciones || [])) {
-      // Last write wins per op_id (tabs only use one assignment per OP)
-      map[row.op_id] = { person: row.persona, stage: row.etapa, estimatedDate: row.fecha_asignacion };
+      if (!map[row.op_id]) map[row.op_id] = [];
+      map[row.op_id].push({ person: row.persona, stage: row.etapa, estimatedDate: row.fecha_asignacion, comentario: row.comentario || '' });
     }
     return map;
   },
@@ -161,6 +161,13 @@ const App = {
     if (this._data) Panel.render({ ...this._data, dbData: this._dbData });
   },
 
+  renderAsignacion() {
+    if (!this._data) return;
+    const supabasePeople = (this._dbData.personas || []).filter(p => p.activo).map(p => p.nombre);
+    const allPeople = [...new Set([...(this._data.ebanistas || []), ...(this._data.pintores || []), ...supabasePeople])];
+    Asignacion.render({ ...this._data, ebanistas: allPeople, dbData: this._dbData });
+  },
+
   rerender() {
     this._renderAll();
   },
@@ -294,9 +301,9 @@ const App = {
     sel.innerHTML = '<option value="">— Persona —</option>' +
       people.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
 
-    // Pre-select assigned person
+    // Pre-select assigned person (first assigned)
     const assignments = this.buildAssignments(this._dbData);
-    const a = assignments[opId];
+    const a = (assignments[opId] || [])[0];
     if (a?.person) sel.value = a.person;
 
     el('complete-date').value         = todayIso();
@@ -326,7 +333,7 @@ const App = {
     const daysInPlant = (firstDate && completedAt) ? daysBetween(firstDate, completedAt) : null;
 
     const assignments = this.buildAssignments(this._dbData);
-    const stage       = assignments[opId]?.stage || null;
+    const stage       = (assignments[opId] || [])[0]?.stage || null;
 
     // Optimistic update: add to local produccion
     this._dbData.produccion.unshift({

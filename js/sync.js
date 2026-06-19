@@ -16,20 +16,23 @@ const Sync = {
         const finDate   = op[finKey];
         if (!finDate) continue;
 
-        const row = asignaciones.find(a => a.op_id === op.id && a.etapa === s.id);
-        if (!row) continue;
+        const rows = asignaciones.filter(a => a.op_id === op.id && a.etapa === s.id);
+        if (!rows.length) continue;
 
-        try {
-          await DB.upsertHistorial({
-            op_id:       op.id,
-            etapa:       s.id,
-            persona:     row.persona,
-            fecha_inicio: op[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null,
-            fecha_fin:   finDate.toISOString().slice(0, 10),
-            es_reproceso: false,
-          });
-        } catch (e) {
-          console.warn('[Sync] historial upsert failed for', op.id, s.id, e.message);
+        for (const row of rows) {
+          try {
+            await DB.upsertHistorial({
+              op_id:        op.id,
+              etapa:        s.id,
+              persona:      row.persona,
+              fecha_inicio: op[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null,
+              fecha_fin:    finDate.toISOString().slice(0, 10),
+              es_reproceso: false,
+              comentario:   row.comentario || null,
+            });
+          } catch (e) {
+            console.warn('[Sync] historial upsert failed for', op.id, s.id, row.persona, e.message);
+          }
         }
       }
     }

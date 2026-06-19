@@ -1,14 +1,21 @@
 // ─────────────────────────────────────────────────────────────
-// js/asignacion.js — Asignación tab: assign person+stage to OPs
-//                    OPs grouped by parent project
+// js/asignacion.js — Asignación tab: assign people+stage to OPs
+//   Multiple people can be assigned to the same OP.
+//   Each person has a comment for what they worked on.
+//   ▶ Inicio = OP-level (first sets the date, others skip)
+//   ■ Fin    = per-person chip (saves historial + removes chip)
 // ─────────────────────────────────────────────────────────────
 
 const Asignacion = {
   _collapsed: new Set(),
+  _ebanistas: [],
+  _fieldIds:  {},
 
   render({ ops, ebanistas, dbData, fieldIds }) {
-    const body = el('asignacion-body');
+    this._ebanistas = ebanistas;
+    this._fieldIds  = fieldIds || {};
 
+    const body = el('asignacion-body');
     if (!ops.length) {
       body.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Sin OPs activos para asignar.</p></div>';
       return;
@@ -16,18 +23,20 @@ const Asignacion = {
 
     const assignments = App.buildAssignments(dbData);
     const priority    = App.buildPriorities(dbData);
-
-    const groups = this._groupByProject(ops, priority);
+    const groups      = this._groupByProject(ops, priority);
 
     body.innerHTML = [...groups.entries()].map(([proj, projOps]) =>
       this._renderGroup(proj, projOps, assignments, ebanistas)
     ).join('');
 
-    this._bindEvents(ops, ebanistas, fieldIds);
+    this._bindEvents(ops, ebanistas, fieldIds || {});
+  },
+
+  _rerender() {
+    App.renderAsignacion();
   },
 
   _groupByProject(ops, priority) {
-    // priority = ordered array of project names (from tablero drag-and-drop)
     const priorityIdx = name => { const i = priority.indexOf(name); return i === -1 ? 999 : i; };
     const map = new Map();
     for (const op of ops) {
@@ -35,14 +44,13 @@ const Asignacion = {
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(op);
     }
-    // Sort the map by project priority order
     return new Map([...map.entries()].sort((a, b) => priorityIdx(a[0]) - priorityIdx(b[0])));
   },
 
   _renderGroup(projName, projOps, assignments, ebanistas) {
     const collapsed     = this._collapsed.has(projName);
     const safeId        = 'ag-' + projName.replace(/[^a-zA-Z0-9]/g, '_');
-    const assignedCount = projOps.filter(op => assignments[op.id]?.person).length;
+    const assignedCount = projOps.filter(op => (assignments[op.id] || []).length > 0).length;
 
     return `
       <div class="proj-group asign-group" data-proj="${esc(projName)}">
@@ -53,15 +61,7 @@ const Asignacion = {
           <span class="asign-group-assigned">${assignedCount}/${projOps.length} asignados</span>
         </div>
         <div class="asign-group-body ${collapsed ? 'proj-group-collapsed' : ''}" id="${safeId}">
-          <div class="asign-table">
-            <div class="asign-table-head">
-              <div>OP / Tarea</div>
-              <div>Etapa actual</div>
-              <div>Persona</div>
-              <div>Etapa asignada</div>
-              <div>Fecha estimada</div>
-              <div>Acciones</div>
-            </div>
+          <div class="asign-cards">
             ${projOps.map(op => this._renderRow(op, assignments, ebanistas)).join('')}
           </div>
         </div>
@@ -70,60 +70,71 @@ const Asignacion = {
   },
 
   _renderRow(op, assignments, ebanistas) {
-    const a     = assignments[op.id];
-    const stage = getCurrentStage(op);
-    const hasReproceso = !!op.inicioReproceso && !op.finReproceso;
+    const opAssigns  = assignments[op.id] || [];
+    const isAssigned = opAssigns.length > 0;
+    const stage      = getCurrentStage(op);
+    const hasRepro   = !!op.inicioReproceso && !op.finReproceso;
 
-    const personOptions = ebanistas.map(name =>
-      `<option value="${esc(name)}" ${a?.person === name ? 'selected' : ''}>${esc(name)}</option>`
+    const personOpts = ebanistas.map(n =>
+      `<option value="${esc(n)}">${esc(n)}</option>`
     ).join('');
 
-    const stageOptions = [
+    const stageOpts = [
       `<option value="">— Etapa —</option>`,
-      ...STAGES.map(s => `<option value="${s.id}" ${a?.stage === s.id ? 'selected' : ''}>${s.label}</option>`),
-      `<option value="reproceso" ${a?.stage === 'reproceso' ? 'selected' : ''}>Reproceso</option>`,
+      ...STAGES.map(s => `<option value="${s.id}">${s.label}</option>`),
+      `<option value="reproceso">Reproceso</option>`,
     ].join('');
 
+    const chips = opAssigns.map(a => `
+      <div class="asign-chip" data-op="${esc(op.id)}" data-person="${esc(a.person)}">
+        <span class="chip-name">${esc(a.person)}</span>
+        ${a.stage && a.stage !== '_' ? `<span class="chip-stage">${esc(STAGE_LABELS[a.stage] || a.stage)}</span>` : ''}
+        <input type="text" class="chip-comment"
+          data-op="${esc(op.id)}" data-person="${esc(a.person)}"
+          value="${esc(a.comentario || '')}" placeholder="Qué hizo...">
+        <button class="btn-chip-fin" data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">■ Fin</button>
+        <button class="btn-chip-remove" data-op="${esc(op.id)}" data-person="${esc(a.person)}">✕</button>
+      </div>
+    `).join('');
+
     return `
-      <div class="asign-row ${a?.person ? 'asign-row-assigned' : 'asign-row-empty'}" data-op-id="${esc(op.id)}">
-        <div class="asign-name">
-          <div>
-            ${op.noOp ? `<span class="asign-op-num">${esc(op.noOp)}</span> ` : ''}${esc(op.name)}
-            ${hasReproceso ? '<span class="badge-reproceso-sm">Reproceso</span>' : ''}
+      <div class="asign-card ${isAssigned ? 'asign-row-assigned' : 'asign-row-empty'}" data-op-id="${esc(op.id)}">
+        <div class="asign-card-hdr">
+          <div class="asign-name">
+            <div>
+              ${op.noOp ? `<span class="asign-op-num">${esc(op.noOp)}</span> ` : ''}${esc(op.name)}
+              ${hasRepro ? '<span class="badge-reproceso-sm">Reproceso</span>' : ''}
+            </div>
+            ${op.project ? `<div class="asign-proj-sub">${esc(op.project)}</div>` : ''}
           </div>
-          ${op.project ? `<div class="asign-proj-sub">${esc(op.project)}</div>` : ''}
+          <div class="asign-card-right">
+            ${stage
+              ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>`
+              : '<span class="muted-txt">—</span>'}
+            <button class="btn-stage-inicio btn-sm" data-op="${esc(op.id)}" title="Marcar inicio de etapa hoy">▶ Inicio</button>
+          </div>
         </div>
-        <div>
-          ${stage
-            ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>`
-            : '<span class="muted-txt">—</span>'}
-        </div>
-        <div>
+        ${opAssigns.length > 0 ? `<div class="asign-chips">${chips}</div>` : ''}
+        <div class="asign-card-add">
           <select class="asign-select asign-person" data-op="${esc(op.id)}">
-            <option value="">— Persona —</option>
-            ${personOptions}
+            <option value="">— Agregar persona —</option>
+            ${personOpts}
           </select>
-        </div>
-        <div>
           <select class="asign-select asign-stage" data-op="${esc(op.id)}">
-            ${stageOptions}
+            ${stageOpts}
           </select>
-        </div>
-        <div>
-          <input type="date" class="asign-date" data-op="${esc(op.id)}" value="${a?.estimatedDate || ''}">
-        </div>
-        <div class="asign-actions">
+          <input type="date" class="asign-date" data-op="${esc(op.id)}">
           <button class="btn-save-asign btn-primary btn-sm" data-op="${esc(op.id)}">✓</button>
           <button class="btn-complete-op btn-secondary btn-sm" data-op="${esc(op.id)}" data-name="${esc(op.name)}">✔ Listo</button>
-          <button class="btn-stage-date btn-stage-inicio btn-sm" data-op="${esc(op.id)}" title="Marcar inicio de etapa hoy">▶ Inicio</button>
-          <button class="btn-stage-date btn-stage-fin btn-sm" data-op="${esc(op.id)}" title="Marcar fin de etapa hoy">■ Fin</button>
         </div>
       </div>
     `;
   },
 
   _bindEvents(ops, ebanistas, fieldIds) {
-    // Collapse/expand groups
+    const rerender = () => this._rerender();
+
+    // ── Collapse/expand groups ────────────────────────────────
     document.querySelectorAll('.asign-group-hdr').forEach(hdr => {
       hdr.addEventListener('click', e => {
         if (e.target.closest('select, input, button')) return;
@@ -144,157 +155,163 @@ const Asignacion = {
       });
     });
 
-    // Save assignment
+    // ── Add person (✓) ────────────────────────────────────────
     document.querySelectorAll('.btn-save-asign').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const opId          = btn.dataset.op;
-        const row           = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
-        if (!row) return;
-        const person        = row.querySelector('.asign-person').value;
-        const stage         = row.querySelector('.asign-stage').value;
-        const estimatedDate = row.querySelector('.asign-date').value;
+        const opId  = btn.dataset.op;
+        const card  = document.querySelector(`.asign-card[data-op-id="${opId}"]`);
+        if (!card) return;
+        const person = card.querySelector('.asign-person').value;
+        const stage  = card.querySelector('.asign-stage').value;
+        const date   = card.querySelector('.asign-date').value;
+        if (!person) return;
 
-        // Optimistic UI update
-        row.classList.toggle('asign-row-assigned', !!person);
-        row.classList.toggle('asign-row-empty', !person);
-        btn.textContent = '✓ Guardado';
-        btn.style.background = '#166534';
-        setTimeout(() => { btn.textContent = '✓'; btn.style.background = ''; }, 1500);
-
-        // Update local cache — replace ALL rows for this op (one per OP)
-        const newRow = { op_id: opId, etapa: stage || '_', persona: person, fecha_asignacion: estimatedDate || todayIso() };
-        App._dbData.asignaciones = App._dbData.asignaciones.filter(a => a.op_id !== opId);
-        App._dbData.asignaciones.push(newRow);
+        // Add to cache (upsert by op+persona)
+        App._dbData.asignaciones = App._dbData.asignaciones.filter(
+          a => !(a.op_id === opId && a.persona === person)
+        );
+        App._dbData.asignaciones.push({
+          op_id: opId, etapa: stage || '_', persona: person,
+          fecha_asignacion: date || todayIso(), comentario: '',
+        });
 
         App.renderPanel();
-        this._updateGroupCount(row);
+        rerender();
 
-        // Persist to Supabase
         try {
-          await DB.setAsignacion(opId, stage || '_', person, estimatedDate || null);
+          await DB.setAsignacion(opId, stage || '_', person, date || null, null);
         } catch (e) {
           console.error('[Asignacion] save failed:', e.message);
         }
       });
     });
 
-    // Mark complete → open modal
+    // ── Mark complete (✔ Listo) ───────────────────────────────
     document.querySelectorAll('.btn-complete-op').forEach(btn => {
       btn.addEventListener('click', () => {
         App.openCompleteModal(btn.dataset.op, btn.dataset.name, ebanistas);
       });
     });
 
-    // Inicio / Fin stage buttons
-    this._bindStageDates(fieldIds);
-
-    // Auto-save on select change — optimistic: update cache + panel instantly, then persist
-    document.querySelectorAll('.asign-person, .asign-stage').forEach(sel => {
-      sel.addEventListener('change', async () => {
-        const opId          = sel.dataset.op;
-        const row           = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
-        if (!row) return;
-        const person        = row.querySelector('.asign-person').value;
-        const stage         = row.querySelector('.asign-stage').value;
-        const estimatedDate = row.querySelector('.asign-date').value;
-
-        row.classList.toggle('asign-row-assigned', !!person);
-        row.classList.toggle('asign-row-empty', !person);
-        this._updateGroupCount(row);
-
-        // Update local cache immediately
-        const newRow = { op_id: opId, etapa: stage || '_', persona: person, fecha_asignacion: estimatedDate || todayIso() };
-        App._dbData.asignaciones = App._dbData.asignaciones.filter(a => a.op_id !== opId);
-        App._dbData.asignaciones.push(newRow);
-
-        // Re-render panel instantly (no Supabase wait)
-        App.renderPanel();
-
-        // Persist to Supabase in background
+    // ── Chip comment save ────────────────────────────────────
+    document.querySelectorAll('.chip-comment').forEach(input => {
+      input.addEventListener('change', async () => {
+        const opId      = input.dataset.op;
+        const person    = input.dataset.person;
+        const comentario = input.value;
+        const row = App._dbData.asignaciones.find(a => a.op_id === opId && a.persona === person);
+        if (row) row.comentario = comentario;
         try {
-          await DB.setAsignacion(opId, stage || '_', person, estimatedDate || null);
+          if (row) await DB.setAsignacion(opId, row.etapa, person, row.fecha_asignacion, comentario);
         } catch (e) {
-          console.error('[Asignacion] auto-save failed:', e.message);
+          console.error('[Asignacion] comment save:', e.message);
         }
       });
     });
-  },
 
-  _bindStageDates(fieldIds) {
-    this._bindStageDateBtn('.btn-stage-inicio', STAGE_INICIO, fieldIds, false);
-    this._bindStageDateBtn('.btn-stage-fin',    STAGE_FIN,    fieldIds, true);
-  },
-
-  // clearOnSuccess=true → clear assignment after Fin so OP can be reassigned to next person
-  _bindStageDateBtn(selector, stageMap, fieldIds, clearOnSuccess) {
-    document.querySelectorAll(selector).forEach(btn => {
+    // ── Chip ■ Fin ───────────────────────────────────────────
+    document.querySelectorAll('.btn-chip-fin').forEach(btn => {
       btn.addEventListener('click', async () => {
-        const opId  = btn.dataset.op;
-        const row   = document.querySelector(`.asign-row[data-op-id="${opId}"]`);
-        const stage = row?.querySelector('.asign-stage')?.value;
+        const opId   = btn.dataset.op;
+        const person = btn.dataset.person;
+        const stage  = btn.dataset.stage;
 
         if (!stage || stage === '_' || stage === 'reproceso') {
-          alert('Selecciona una etapa válida primero'); return;
+          alert('Esta asignación no tiene etapa válida'); return;
         }
 
-        const dateKey = stageMap[stage];
+        const dateKey = STAGE_FIN[stage];
         const fieldId = fieldIds?.[dateKey];
-        if (!fieldId) { alert('Campo de fecha no encontrado en ClickUp'); return; }
+        if (!fieldId) { alert('Campo de fin no encontrado en ClickUp'); return; }
 
         const orig = btn.textContent;
         btn.textContent = '...'; btn.disabled = true;
 
         try {
+          const chip       = btn.closest('.asign-chip');
+          const comentario = chip?.querySelector('.chip-comment')?.value || '';
+          const op         = App._data?.ops.find(o => o.id === opId);
+          const today      = todayIso();
+          const inicioKey  = STAGE_INICIO[stage];
+          const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
+
+          // Save historial before removing assignment
+          const histEntry = { op_id: opId, etapa: stage, persona: person, fecha_inicio: fechaInicio, fecha_fin: today, es_reproceso: false, comentario };
+          App._dbData.historial = (App._dbData.historial || []).filter(
+            h => !(h.op_id === opId && h.etapa === stage && h.persona === person)
+          );
+          App._dbData.historial.unshift(histEntry);
+          DB.upsertHistorial(histEntry).catch(e => console.warn('[Asignacion] historial:', e.message));
+
+          // Remove this person's assignment
+          App._dbData.asignaciones = App._dbData.asignaciones.filter(
+            a => !(a.op_id === opId && a.persona === person)
+          );
+          DB.removeAsignacion(opId, person).catch(e => console.warn('[Asignacion] remove:', e.message));
+
+          // Set ClickUp fin date (last person wins)
           await PlantaAPI.setField(opId, fieldId, Date.now());
-          const op = App._data?.ops.find(o => o.id === opId);
           if (op) op[dateKey] = new Date();
+          PlantaAPI.clearCache();
 
-          if (clearOnSuccess) {
-            // Guardar historial ANTES de limpiar (si no, el sync ya no encuentra la asignación)
-            const assignment = App._dbData.asignaciones.find(a => a.op_id === opId);
-            const person = assignment?.persona || row?.querySelector('.asign-person')?.value;
-            if (person) {
-              const today      = todayIso();
-              const inicioKey  = STAGE_INICIO[stage];
-              const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
-              const histEntry  = { op_id: opId, etapa: stage, persona: person, fecha_inicio: fechaInicio, fecha_fin: today, es_reproceso: false };
-              App._dbData.historial = (App._dbData.historial || []).filter(h => !(h.op_id === opId && h.etapa === stage));
-              App._dbData.historial.unshift(histEntry);
-              DB.upsertHistorial(histEntry).catch(e => console.warn('[Asignacion] historial:', e.message));
-            }
+          App.renderPanel();
+          Proyectos.render({ ...App._data, dbData: App._dbData });
+          rerender();
 
-            // Limpiar asignación para que el OP pueda asignarse a la siguiente persona
-            const personSel = row?.querySelector('.asign-person');
-            const stageSel  = row?.querySelector('.asign-stage');
-            if (personSel) personSel.value = '';
-            if (stageSel)  stageSel.value  = '';
-            row?.classList.remove('asign-row-assigned');
-            row?.classList.add('asign-row-empty');
-            this._updateGroupCount(row);
-            App._dbData.asignaciones = App._dbData.asignaciones.filter(a => a.op_id !== opId);
-            App.renderPanel();
-            DB.removeAsignacion(opId).catch(e => console.warn('[Asignacion] remove:', e.message));
-          }
+        } catch (e) {
+          alert('Error al actualizar ClickUp: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
 
+    // ── Chip ✕ remove ────────────────────────────────────────
+    document.querySelectorAll('.btn-chip-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const opId   = btn.dataset.op;
+        const person = btn.dataset.person;
+        App._dbData.asignaciones = App._dbData.asignaciones.filter(
+          a => !(a.op_id === opId && a.persona === person)
+        );
+        App.renderPanel();
+        DB.removeAsignacion(opId, person).catch(e => console.warn('[Asignacion] remove:', e.message));
+        rerender();
+      });
+    });
+
+    // ── ▶ Inicio (OP-level, first person wins) ───────────────
+    document.querySelectorAll('.btn-stage-inicio').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const opId  = btn.dataset.op;
+        const op    = App._data?.ops.find(o => o.id === opId);
+        const stage = getCurrentStage(op);
+        if (!stage) { alert('No hay etapa activa para este OP'); return; }
+
+        const dateKey = STAGE_INICIO[stage];
+        const fieldId = fieldIds?.[dateKey];
+        if (!fieldId) { alert('Campo de inicio no encontrado en ClickUp'); return; }
+
+        if (op?.[dateKey]) {
+          btn.textContent = '✓ Ya iniciado';
+          setTimeout(() => { btn.textContent = '▶ Inicio'; }, 1500);
+          return;
+        }
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+        try {
+          await PlantaAPI.setField(opId, fieldId, Date.now());
+          if (op) op[dateKey] = new Date();
           PlantaAPI.clearCache();
           Proyectos.render({ ...App._data, dbData: App._dbData });
           btn.textContent = '✓'; btn.style.color = 'var(--green)';
           setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 2000);
         } catch (e) {
-          alert('Error al actualizar ClickUp: ' + e.message);
+          alert('Error: ' + e.message);
           btn.textContent = orig;
         }
         btn.disabled = false;
       });
     });
-  },
-
-  _updateGroupCount(row) {
-    const group   = row.closest('.asign-group');
-    if (!group) return;
-    const allRows = group.querySelectorAll('.asign-row');
-    const assigned = group.querySelectorAll('.asign-row-assigned').length;
-    const counter  = group.querySelector('.asign-group-assigned');
-    if (counter) counter.textContent = `${assigned}/${allRows.length} asignados`;
   },
 };

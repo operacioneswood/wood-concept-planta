@@ -595,6 +595,76 @@ body {
 .btn-stage-date:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ════════════════════════════════════════════════════════════
+   ASIGNACIÓN — CARD + CHIP LAYOUT
+   ════════════════════════════════════════════════════════════ */
+.asign-cards { padding: 4px 8px 8px; display: flex; flex-direction: column; gap: 8px; }
+
+.asign-card {
+  background: var(--card); border-radius: 8px;
+  border: 1px solid var(--border); overflow: hidden;
+}
+.asign-card.asign-row-assigned { border-left: 3px solid var(--green); }
+.asign-card.asign-row-empty    { border-left: 3px solid transparent; }
+
+.asign-card-hdr {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 12px;
+  padding: 10px 12px;
+}
+.asign-card-right {
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+
+/* Chips row */
+.asign-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 0 12px 10px;
+}
+.asign-chip {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--divider); border: 1px solid var(--border);
+  border-radius: 20px; padding: 4px 8px;
+  flex-wrap: wrap;
+}
+.chip-name {
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.chip-stage {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted);
+  background: var(--card); border-radius: 3px; padding: 1px 5px;
+}
+.chip-comment {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 2px 8px; font-size: 11px; font-family: inherit;
+  color: var(--text); background: var(--card); width: 140px;
+}
+.chip-comment:focus { outline: none; border-color: var(--blue); }
+.btn-chip-fin {
+  background: #fef2f2; border: 1px solid #fecaca;
+  color: #991b1b; border-radius: 12px; padding: 2px 8px;
+  font-size: 11px; font-weight: 600; cursor: pointer;
+  white-space: nowrap; transition: background .15s;
+}
+.btn-chip-fin:hover { background: #fee2e2; }
+.btn-chip-fin:disabled { opacity: .5; cursor: not-allowed; }
+.btn-chip-remove {
+  background: none; border: none; color: var(--faint);
+  cursor: pointer; font-size: 13px; padding: 0 2px;
+  border-radius: 50%; line-height: 1; transition: color .1s;
+}
+.btn-chip-remove:hover { color: var(--red); }
+
+/* Add person row */
+.asign-card-add {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  padding: 8px 12px; background: var(--bg);
+  border-top: 1px solid var(--divider);
+}
+.asign-card-add .asign-select,
+.asign-card-add .asign-date { flex: 1; min-width: 100px; }
+
+/* ════════════════════════════════════════════════════════════
    RENDIMIENTO TAB
    ════════════════════════════════════════════════════════════ */
 .rend-controls { margin-bottom: 20px; }
@@ -670,14 +740,28 @@ body {
 .rend-stat-reproceso .rend-stat-val { color: var(--amber); }
 
 .rend-log-preview { display: flex; flex-direction: column; gap: 4px; }
+.rend-log-entry  { display: flex; flex-direction: column; gap: 2px; }
 .rend-log-item {
-  display: flex; justify-content: space-between; gap: 8px;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
   font-size: 12px;
 }
+.rend-log-right  { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .rend-log-repro  { color: var(--amber); font-weight: 500; }
 .rend-log-stage  { font-size: 10px; color: var(--muted); background: var(--divider); border-radius: 3px; padding: 1px 4px; margin-left: 4px; }
 .rend-log-more   { font-size: 12px; margin-top: 4px; }
-.rend-empty     { font-size: 12px; }
+.rend-empty      { font-size: 12px; }
+.btn-rend-expand {
+  background: none; border: none; cursor: pointer;
+  font-size: 13px; padding: 0 2px; line-height: 1;
+  opacity: .7; transition: opacity .1s;
+}
+.btn-rend-expand:hover { opacity: 1; }
+.rend-comment-box {
+  font-size: 11px; color: var(--muted);
+  background: var(--divider); border-radius: 5px;
+  padding: 5px 8px; margin-left: 4px; margin-bottom: 2px;
+  border-left: 2px solid var(--border);
+}
 
 /* ════════════════════════════════════════════════════════════
    MODALS

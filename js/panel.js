@@ -11,7 +11,7 @@ const Panel = {
     // Build per-person data
     const personData = ebanistas.map(name => {
       const role  = personasMap[name] || 'ebanista';
-      const myOps = ops.filter(op => assignments[op.id]?.person === name);
+      const myOps = ops.filter(op => (assignments[op.id] || []).some(a => a.person === name));
       return { name, role, myOps };
     });
 
@@ -22,7 +22,7 @@ const Panel = {
 
     // Only plant employees count for "sin trabajo" alerts
     const plantaPeople  = [...ebanistasData, ...pintoresData, ...(ebanistasData.length ? [] : unknownData)];
-    const unassignedOps = ops.filter(op => !assignments[op.id]?.person);
+    const unassignedOps = ops.filter(op => !(assignments[op.id]?.length > 0));
     const noWorkPeople  = plantaPeople.filter(p => p.myOps.length === 0);
 
     // Metrics strip
@@ -76,7 +76,7 @@ const Panel = {
     const noWork = myOps.length === 0;
 
     const taskList = myOps.map((op, idx) => {
-      const a     = assignments[op.id];
+      const a     = (assignments[op.id] || []).find(x => x.person === name);
       const stage = a?.stage ? STAGE_LABELS[a.stage] : null;
       const color = a?.stage ? STAGE_COLORS[a.stage] : null;
       return `

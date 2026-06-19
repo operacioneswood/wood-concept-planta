@@ -128,7 +128,7 @@ const Tablero = {
     container.innerHTML = contratistas.map(name => {
       // Find all OPs assigned to this contractor
       const myOpIds = Object.entries(assignments)
-        .filter(([, a]) => a.person === name)
+        .filter(([, arr]) => arr.some(a => a.person === name))
         .map(([opId]) => opId);
       const myOps = myOpIds.map(id => opMap[id]).filter(Boolean);
 
