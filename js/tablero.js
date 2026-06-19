@@ -10,44 +10,49 @@ const Tablero = {
     this._renderProductionLog(dbData);
   },
 
-  // ── Left column: priority order ───────────────────────────
+  // ── Left column: priority order (by project) ─────────────
   _renderPriority(ops, dbData) {
-    const priority    = App.buildPriorities(dbData);
-    const assignments = App.buildAssignments(dbData);
+    const priority = App.buildPriorities(dbData); // array of project names
 
-    // Merge saved order with live ops (new ops appended at end)
-    const opMap       = Object.fromEntries(ops.map(o => [o.id, o]));
-    const orderedIds  = [
-      ...priority.filter(id => opMap[id]),
-      ...ops.filter(o => !priority.includes(o.id)).map(o => o.id),
+    // Group OPs by project
+    const projectMap = new Map();
+    for (const op of ops) {
+      const proj = op.project || '(Sin proyecto)';
+      if (!projectMap.has(proj)) projectMap.set(proj, []);
+      projectMap.get(proj).push(op);
+    }
+
+    // Merge saved order with live projects (new ones appended)
+    const allProjects = [...projectMap.keys()];
+    const orderedProjects = [
+      ...priority.filter(name => projectMap.has(name)),
+      ...allProjects.filter(name => !priority.includes(name)),
     ];
 
-    el('tablero-prio-count').textContent = orderedIds.length;
+    el('tablero-prio-count').textContent = orderedProjects.length;
 
     const list = el('tablero-prio-list');
-    if (!orderedIds.length) {
+    if (!orderedProjects.length) {
       list.innerHTML = '<div class="empty-state-sm">Sin OPs activos</div>';
       return;
     }
 
-    list.innerHTML = orderedIds.map((id, idx) => {
-      const op = opMap[id];
-      if (!op) return '';
-      const a     = assignments[id];
-      const stage = getCurrentStage(op);
+    list.innerHTML = orderedProjects.map((proj, idx) => {
+      const projOps = projectMap.get(proj) || [];
+      const statuses = [...new Set(projOps.map(op => op.status))];
+      const anyRepro = projOps.some(op => !!op.inicioReproceso && !op.finReproceso);
       return `
-        <div class="tablero-item" draggable="true" data-id="${esc(id)}" data-name="${esc(op.name)}">
+        <div class="tablero-item" draggable="true" data-id="${esc(proj)}" data-name="${esc(proj)}">
           <span class="drag-handle">⠿</span>
           <span class="tablero-rank">${idx + 1}</span>
           <div class="tablero-item-info">
-            <div class="tablero-item-name">${esc(op.name)}</div>
+            <div class="tablero-item-name">${esc(proj)}</div>
             <div class="tablero-item-meta">
-              ${op.project ? `<span>${esc(op.project)}</span>` : ''}
-              ${a?.person ? `<span class="tbl-assignee">${esc(a.person)}</span>` : ''}
-              ${stage ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>` : ''}
+              <span>${projOps.length} OP${projOps.length !== 1 ? 's' : ''}</span>
+              ${anyRepro ? '<span class="badge-reproceso-sm">Reproceso</span>' : ''}
+              ${statuses.map(s => this._statusBadgeSm(s)).join('')}
             </div>
           </div>
-          ${this._statusBadgeSm(op.status)}
         </div>
       `;
     }).join('');

@@ -27,15 +27,16 @@ const Asignacion = {
   },
 
   _groupByProject(ops, priority) {
-    const priorityIdx = id => { const i = priority.indexOf(id); return i === -1 ? 999 : i; };
+    // priority = ordered array of project names (from tablero drag-and-drop)
+    const priorityIdx = name => { const i = priority.indexOf(name); return i === -1 ? 999 : i; };
     const map = new Map();
     for (const op of ops) {
       const key = op.project || '(Sin proyecto)';
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(op);
     }
-    for (const [, arr] of map) arr.sort((a, b) => priorityIdx(a.id) - priorityIdx(b.id));
-    return map;
+    // Sort the map by project priority order
+    return new Map([...map.entries()].sort((a, b) => priorityIdx(a[0]) - priorityIdx(b[0])));
   },
 
   _renderGroup(projName, projOps, assignments, ebanistas) {
