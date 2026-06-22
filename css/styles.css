@@ -790,6 +790,62 @@ body {
   border-left: 2px solid var(--border);
 }
 
+/* ── Historial panel ── */
+.rend-hist-section {
+  margin-top: 12px;
+  border-top: 1px solid var(--divider);
+  padding-top: 10px;
+}
+.btn-rend-historial {
+  width: 100%; background: none; border: 1px solid var(--border);
+  border-radius: 6px; padding: 5px 10px;
+  font-size: 11px; font-family: inherit; color: var(--muted);
+  cursor: pointer; text-align: left; transition: background .1s;
+}
+.btn-rend-historial:hover { background: var(--divider); color: var(--text); }
+
+.rend-hist-panel { margin-top: 10px; }
+.rend-hist-scroll { overflow-x: auto; }
+
+.rend-hist-table {
+  width: 100%; border-collapse: collapse; font-size: 11px;
+  min-width: 520px;
+}
+.rend-hist-table th {
+  text-align: left; padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted);
+  white-space: nowrap;
+}
+.rend-hist-table td { padding: 4px 6px; border-bottom: 1px solid var(--divider); vertical-align: middle; }
+.rh-row:last-child td { border-bottom: none; }
+.rh-row:hover td { background: var(--bg); }
+.rh-row-repro td { background: rgba(146,64,14,.04); }
+
+.rh-op-cell    { font-weight: 600; white-space: nowrap; max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+.rh-etapa-cell { white-space: nowrap; color: var(--muted); }
+.rh-repro-cell { text-align: center; }
+
+.rh-input {
+  border: 1px solid transparent; border-radius: 4px;
+  padding: 2px 5px; font-size: 11px; font-family: inherit;
+  color: var(--text); background: transparent; width: 100%;
+  min-width: 0;
+}
+.rh-input:hover  { border-color: var(--border); background: var(--card); }
+.rh-input:focus  { border-color: var(--blue); background: var(--card); outline: none; }
+.rh-comment      { min-width: 110px; }
+
+.rh-actions { display: flex; gap: 3px; white-space: nowrap; }
+.btn-rh-save, .btn-rh-delete {
+  background: none; border: none; cursor: pointer;
+  font-size: 13px; padding: 2px 4px; border-radius: 4px;
+  transition: background .1s;
+}
+.btn-rh-save:hover   { background: var(--green-bg); }
+.btn-rh-delete:hover { background: var(--red-bg); }
+
 /* ════════════════════════════════════════════════════════════
    MODALS
    ════════════════════════════════════════════════════════════ */

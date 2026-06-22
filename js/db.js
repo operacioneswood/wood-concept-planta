@@ -80,6 +80,12 @@ const DB = {
     ));
   },
 
+  async deleteHistorial(op_id, etapa, persona) {
+    const { error } = await this._sb.from('historial').delete()
+      .eq('op_id', op_id).eq('etapa', etapa).eq('persona', persona);
+    if (error) throw error;
+  },
+
   // ════════════════════════════════════════════════════════
   // PRODUCCION  (log of completed OPs)
   // ════════════════════════════════════════════════════════
