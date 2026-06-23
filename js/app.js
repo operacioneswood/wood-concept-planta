@@ -185,6 +185,24 @@ const App = {
 
     el('btn-refresh')?.addEventListener('click', () => this._sync({ force: true }));
     el('btn-settings')?.addEventListener('click', () => this._openSettings());
+
+    // ── Tablet / Desktop mode toggle ─────────────────────────
+    const tabBtn = el('btn-tablet-toggle');
+    if (tabBtn) {
+      const apply = isTablet => {
+        document.body.classList.toggle('tablet', isTablet);
+        tabBtn.textContent = isTablet ? '💻' : '📱';
+        tabBtn.title       = isTablet ? 'Cambiar a modo computadora' : 'Cambiar a modo tablet';
+      };
+      const saved = localStorage.getItem('wp_tablet_mode');
+      const autoTablet = saved === null && window.innerWidth <= 1024;
+      apply(saved === '1' || autoTablet);
+      tabBtn.addEventListener('click', () => {
+        const nowTablet = !document.body.classList.contains('tablet');
+        localStorage.setItem('wp_tablet_mode', nowTablet ? '1' : '0');
+        apply(nowTablet);
+      });
+    }
   },
 
   // ── Settings modal ────────────────────────────────────────

@@ -927,3 +927,97 @@ body {
   display: flex; gap: 10px; justify-content: flex-end;
   margin-top: 20px;
 }
+
+/* ════════════════════════════════════════════════════════════
+   TABLET MODE  (.tablet class on <body>)
+   Larger touch targets, 16px inputs (no iOS zoom), more padding.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Nav ── */
+.tablet .app-nav { height: 58px; }
+.tablet .app-body { padding-top: 58px; }
+.tablet .brand-name,
+.tablet .brand-sep,
+.tablet .brand-sub { display: none; }
+.tablet .nav-btn   { padding: 10px 18px; font-size: 14px; }
+.tablet .btn-icon  { padding: 8px 12px; font-size: 18px; min-width: 44px; min-height: 44px; }
+.tablet .sync-status { display: none; }
+
+/* ── Generic buttons ── */
+.tablet .btn-primary  { padding: 11px 20px; font-size: 14px; min-height: 44px; }
+.tablet .btn-secondary{ padding: 10px 18px; font-size: 14px; min-height: 44px; }
+.tablet .btn-sm       { padding: 9px 16px;  font-size: 13px; min-height: 40px; }
+
+/* ── All text inputs / selects — 16px prevents iOS zoom-on-focus ── */
+.tablet input[type="text"],
+.tablet input[type="date"],
+.tablet input[type="search"],
+.tablet input[type="password"],
+.tablet select {
+  font-size: 16px !important;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+/* ── Tab content ── */
+.tablet .tab-wrap { padding: 20px 16px 100px; }
+
+/* ── Panel ── */
+.tablet .panel-table-head,
+.tablet .panel-row { padding: 12px 16px; }
+.tablet .panel-task-row { padding: 8px 0; gap: 10px; min-height: 36px; }
+
+/* ── Asignación search ── */
+.tablet .asign-search-input { min-height: 48px; border-radius: 10px; }
+
+/* ── Asignación cards ── */
+.tablet .asign-card-hdr { padding: 14px 16px; gap: 14px; }
+.tablet .asign-card-add { padding: 12px 16px; gap: 10px; }
+.tablet .asign-chips    { padding: 4px 16px 14px; gap: 10px; }
+
+/* ── Chips ── */
+.tablet .asign-chip { padding: 8px 12px; gap: 10px; border-radius: 24px; }
+.tablet .chip-name  { font-size: 14px; }
+.tablet .chip-stage { font-size: 12px; padding: 2px 7px; }
+.tablet .chip-comment { width: 200px; border-radius: 16px; }
+.tablet .btn-chip-fin {
+  padding: 8px 16px; font-size: 13px;
+  min-height: 40px; border-radius: 16px;
+}
+.tablet .btn-chip-remove {
+  font-size: 20px; padding: 4px 8px;
+  min-width: 36px; min-height: 36px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* ── Cerrar / Inicio stage buttons ── */
+.tablet .btn-cerrar-etapa { padding: 9px 16px; min-height: 40px; font-size: 13px; }
+.tablet .btn-stage-inicio { padding: 9px 14px; min-height: 40px; }
+
+/* ── Tablero ── */
+.tablet .tablero-item { padding: 14px 16px; }
+.tablet .tablero-list { padding: 10px; }
+
+/* ── Rendimiento ── */
+.tablet .rend-person-card { padding: 20px; }
+.tablet .rend-period-btn  { padding: 10px 22px; font-size: 14px; }
+.tablet .btn-rend-historial { padding: 8px 14px; font-size: 13px; min-height: 40px; }
+
+/* ── Historial table ── */
+.tablet .rend-hist-table th,
+.tablet .rend-hist-table td { padding: 8px 8px; }
+.tablet .rh-input { padding: 7px 8px; min-height: 38px; font-size: 14px !important; }
+.tablet .btn-rh-save,
+.tablet .btn-rh-delete {
+  font-size: 20px; padding: 6px 10px;
+  min-height: 40px; min-width: 40px;
+}
+
+/* ── Modals ── */
+.tablet .modal-card  { max-width: 620px; }
+.tablet .field-input { min-height: 48px; }
+.tablet .role-row    { padding: 14px 0; }
+.tablet .role-radios { gap: 20px; }
+.tablet .role-label  { font-size: 14px; gap: 8px; }
+.tablet input[type="radio"],
+.tablet input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
