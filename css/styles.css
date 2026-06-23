@@ -457,6 +457,7 @@ body {
   justify-content: space-between; gap: 16px; margin-bottom: 8px;
 }
 .proj-card-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.proj-op-num  { font-size: 11px; font-weight: 700; color: var(--muted); background: var(--divider); border-radius: 4px; padding: 2px 7px; white-space: nowrap; }
 .proj-op-name { font-size: 15px; font-weight: 700; }
 
 .proj-card-meta {

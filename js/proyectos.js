@@ -24,10 +24,16 @@ const Proyectos = {
       body.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><p>Sin OPs activos en planta.</p></div>';
     } else {
       const groups = this._groupByProject(ops);
-      body.innerHTML = [...groups.entries()].map(([proj, projOps]) =>
-        this._renderGroup(proj, projOps, contratistas)
-      ).join('');
+      body.innerHTML = `
+        <div class="asign-search-wrap">
+          <input type="search" id="proy-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre...">
+        </div>
+        ${[...groups.entries()].map(([proj, projOps]) =>
+          this._renderGroup(proj, projOps, contratistas)
+        ).join('')}
+      `;
       this._bindEvents(ops, contratistas);
+      this._bindSearch();
     }
 
     // Completed table
@@ -80,10 +86,13 @@ const Proyectos = {
     const hasReproceso = !!op.inicioReproceso && !op.finReproceso;
     const ct           = contratistas[op.id];
 
+    const searchText = `${op.project || ''} ${op.noOp || ''} ${op.name || ''}`.toLowerCase();
+
     return `
-      <div class="proj-card" data-op-id="${esc(op.id)}">
+      <div class="proj-card" data-op-id="${esc(op.id)}" data-search="${esc(searchText)}">
         <div class="proj-card-top">
           <div class="proj-card-title">
+            ${op.noOp ? `<span class="proj-op-num">${esc(op.noOp)}</span>` : ''}
             <span class="proj-op-name">${esc(op.name)}</span>
             ${hasReproceso ? '<span class="badge-reproceso">⚠ Reproceso</span>' : ''}
           </div>
@@ -238,6 +247,21 @@ const Proyectos = {
       btn.addEventListener('click', () => {
         const op = ops.find(o => o.id === btn.dataset.op);
         if (op) Tiempos.open(op);
+      });
+    });
+  },
+
+  _bindSearch() {
+    const input = document.getElementById('proy-search');
+    if (!input) return;
+    input.addEventListener('input', () => {
+      const q = input.value.toLowerCase().trim();
+      document.querySelectorAll('.proj-card').forEach(card => {
+        card.style.display = (!q || (card.dataset.search || '').includes(q)) ? '' : 'none';
+      });
+      document.querySelectorAll('.proj-group').forEach(group => {
+        const anyVisible = [...group.querySelectorAll('.proj-card')].some(c => c.style.display !== 'none');
+        group.style.display = anyVisible ? '' : 'none';
       });
     });
   },
