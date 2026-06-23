@@ -88,18 +88,45 @@ const Panel = {
       : myOps;
 
     const taskList = orderedOps.map((op, idx) => {
-      const a             = (assignments[op.id] || []).find(x => x.person === name);
-      const stageId       = a?.stage && a.stage !== '_' && a.stage !== 'reproceso' ? a.stage : null;
-      const stageLabel    = stageId ? STAGE_LABELS[stageId] : null;
-      const stageColor    = stageId ? STAGE_COLORS[stageId] : null;
+      // All assignments this person has for this OP (may be multiple stages)
+      const personAssigns = (assignments[op.id] || []).filter(x => x.person === name);
 
-      // ✓ Cerrar button: only when inicio set, fin not set, fieldId known
-      const inicioKey    = stageId ? STAGE_INICIO[stageId] : null;
-      const finKey       = stageId ? STAGE_FIN[stageId] : null;
-      const stageStarted = inicioKey && op[inicioKey];
-      const stageClosed  = finKey && op[finKey];
-      const fieldId      = finKey ? (this._fieldIds[finKey] || '') : '';
-      const showCerrar   = stageStarted && !stageClosed && fieldId;
+      const stageInfos = personAssigns.map(a => {
+        const stageId    = a.stage && a.stage !== '_' && a.stage !== 'reproceso' ? a.stage : null;
+        const stageLabel = stageId ? STAGE_LABELS[stageId] : null;
+        const stageColor = stageId ? STAGE_COLORS[stageId] : null;
+        const inicioKey  = stageId ? STAGE_INICIO[stageId] : null;
+        const finKey     = stageId ? STAGE_FIN[stageId]    : null;
+        const stageStarted = inicioKey && op[inicioKey];
+        const stageClosed  = finKey && op[finKey];
+        const fieldId      = finKey ? (this._fieldIds[finKey] || '') : '';
+        const showCerrar   = stageStarted && !stageClosed && fieldId;
+        return { stageId, stageLabel, stageColor, finKey, fieldId, showCerrar };
+      });
+
+      const pills = stageInfos
+        .filter(s => s.stageLabel)
+        .map(s => `<span class="stage-pill-sm" style="color:${s.stageColor}">${esc(s.stageLabel)}</span>`)
+        .join('');
+
+      const finBtns = stageInfos
+        .filter(s => s.stageId)
+        .map(s => `
+          <button class="panel-btn-fin"
+            data-op="${esc(op.id)}"
+            data-person="${esc(name)}"
+            data-stage="${esc(s.stageId)}">■ Fin${stageInfos.length > 1 ? ' ' + esc(s.stageLabel) : ''}</button>
+        `).join('');
+
+      const cerrarBtns = stageInfos
+        .filter(s => s.showCerrar)
+        .map(s => `
+          <button class="panel-btn-cerrar"
+            data-op="${esc(op.id)}"
+            data-stage="${esc(s.stageId)}"
+            data-fieldid="${esc(s.fieldId)}"
+            data-datekey="${esc(s.finKey)}">✓ Cerrar${stageInfos.length > 1 ? ' ' + esc(s.stageLabel) : ''}</button>
+        `).join('');
 
       return `
         <div class="panel-task-row ${idx === 0 ? 'panel-task-current' : ''}"
@@ -110,21 +137,10 @@ const Panel = {
           ${op.noOp ? `<span class="panel-op-num">${esc(op.noOp)}</span>` : ''}
           ${op.project ? `<span class="panel-proj-lbl">${esc(op.project)}</span>` : ''}
           <span class="panel-task-name">${esc(op.name)}</span>
-          ${stageLabel ? `<span class="stage-pill-sm" style="color:${stageColor}">${esc(stageLabel)}</span>` : ''}
+          ${pills}
           <div class="panel-task-actions">
-            ${stageId ? `
-              <button class="panel-btn-fin"
-                data-op="${esc(op.id)}"
-                data-person="${esc(name)}"
-                data-stage="${esc(stageId)}">■ Fin</button>
-            ` : ''}
-            ${showCerrar ? `
-              <button class="panel-btn-cerrar"
-                data-op="${esc(op.id)}"
-                data-stage="${esc(stageId)}"
-                data-fieldid="${esc(fieldId)}"
-                data-datekey="${esc(finKey)}">✓ Cerrar</button>
-            ` : ''}
+            ${finBtns}
+            ${cerrarBtns}
           </div>
         </div>
       `;
