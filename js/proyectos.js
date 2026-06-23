@@ -6,7 +6,6 @@ const Proyectos = {
   _collapsed: new Set(),
 
   render({ ops, dbData }) {
-    // Produccion log from Supabase
     const log = (dbData?.produccion || []).map(r => ({
       name:         r.nombre_op,
       project:      r.proyecto,
@@ -16,9 +15,19 @@ const Proyectos = {
       daysInPlant:  r.dias_en_planta,
     }));
 
-    // Contratistas stay in localStorage (not in Supabase schema)
     const contratistas = Storage.getContratistas();
     const body         = el('proyectos-body');
+
+    // Build tiempos lookup: { op_id: { etapa: record } }
+    const allTiempos = dbData?.tiempos || [];
+    const tiemposMap = {};
+    for (const t of allTiempos) {
+      if (!tiemposMap[t.op_id]) tiemposMap[t.op_id] = {};
+      tiemposMap[t.op_id][t.etapa] = t;
+    }
+
+    // Compute averages across all OPs
+    const avgMap = this._calcAverages(allTiempos);
 
     if (!ops.length) {
       body.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><p>Sin OPs activos en planta.</p></div>';
@@ -28,8 +37,9 @@ const Proyectos = {
         <div class="asign-search-wrap">
           <input type="search" id="proy-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre...">
         </div>
+        ${Object.keys(avgMap).length ? this._renderAverages(avgMap) : ''}
         ${[...groups.entries()].map(([proj, projOps]) =>
-          this._renderGroup(proj, projOps, contratistas)
+          this._renderGroup(proj, projOps, contratistas, tiemposMap)
         ).join('')}
       `;
       this._bindEvents(ops, contratistas);
@@ -58,7 +68,7 @@ const Proyectos = {
     return map;
   },
 
-  _renderGroup(projName, projOps, contratistas) {
+  _renderGroup(projName, projOps, contratistas, tiemposMap) {
     const collapsed   = this._collapsed.has(projName);
     const safeId      = projName.replace(/[^a-zA-Z0-9]/g, '_');
     const anyRepro    = projOps.some(op => !!op.inicioReproceso && !op.finReproceso);
@@ -72,19 +82,20 @@ const Proyectos = {
           <span class="proj-group-count">${projOps.length} OP${projOps.length !== 1 ? 's' : ''}</span>
         </div>
         <div class="proj-group-body ${collapsed ? 'proj-group-collapsed' : ''}" id="proj-body-${safeId}">
-          ${projOps.map(op => this._renderCard(op, contratistas)).join('')}
+          ${projOps.map(op => this._renderCard(op, contratistas, tiemposMap)).join('')}
         </div>
       </div>
     `;
   },
 
-  _renderCard(op, contratistas) {
+  _renderCard(op, contratistas, tiemposMap) {
     const stage        = getCurrentStage(op);
     const firstDate    = firstActivityDate(op);
     const daysInPlant  = firstDate ? daysSince(firstDate) : null;
     const daysInStage  = stage && op[STAGE_INICIO[stage]] ? daysSince(op[STAGE_INICIO[stage]]) : null;
     const hasReproceso = !!op.inicioReproceso && !op.finReproceso;
     const ct           = contratistas[op.id];
+    const opTiempos    = (tiemposMap || {})[op.id] || {};
 
     const searchText = `${op.project || ''} ${op.noOp || ''} ${op.name || ''}`.toLowerCase();
 
@@ -120,9 +131,12 @@ const Proyectos = {
               const done   = !!op[STAGE_FIN[s.id]];
               const active = s.id === stage;
               const date   = done ? op[STAGE_FIN[s.id]] : (active ? op[STAGE_INICIO[s.id]] : null);
+              const t      = opTiempos[s.id];
+              const dur    = t ? this._calcDuration(t.fecha_inicio, t.hora_inicio, t.fecha_fin, t.hora_fin) : null;
               return `<div class="stage-lbl ${done ? 'stage-lbl-done' : active ? 'stage-lbl-active' : 'stage-lbl-empty'}">
                 <span>${esc(s.label)}</span>
                 ${date ? `<span class="stage-date">${fmtDate(date)}</span>` : ''}
+                ${dur && dur !== '—' ? `<span class="stage-dur">⏱ ${dur}</span>` : ''}
               </div>`;
             }).join('')}
           </div>
@@ -163,6 +177,71 @@ const Proyectos = {
     `;
   },
 
+  // ── Averages ─────────────────────────────────────────────────
+  _calcAverages(allTiempos) {
+    const sums = {};
+    for (const t of allTiempos) {
+      if (!t.fecha_inicio || !t.fecha_fin) continue;
+      const start = new Date(`${t.fecha_inicio}T${t.hora_inicio || '00:00'}`);
+      const end   = new Date(`${t.fecha_fin}T${t.hora_fin || '00:00'}`);
+      const mins  = Math.round((end - start) / 60000);
+      if (isNaN(mins) || mins <= 0) continue;
+      if (!sums[t.etapa]) sums[t.etapa] = { total: 0, count: 0 };
+      sums[t.etapa].total += mins;
+      sums[t.etapa].count++;
+    }
+    const result = {};
+    for (const [etapa, s] of Object.entries(sums)) {
+      result[etapa] = { avg: Math.round(s.total / s.count), count: s.count };
+    }
+    return result;
+  },
+
+  _renderAverages(avgMap) {
+    const items = STAGES
+      .filter(s => avgMap[s.id])
+      .map(s => {
+        const { avg, count } = avgMap[s.id];
+        return `
+          <div class="prom-item">
+            <span class="prom-etapa" style="color:${s.color}">${esc(s.label)}</span>
+            <span class="prom-val">${this._fmtMins(avg)}</span>
+            <span class="prom-count">${count} OP${count !== 1 ? 's' : ''}</span>
+          </div>
+        `;
+      });
+    if (!items.length) return '';
+    return `
+      <div class="promedios-strip">
+        <div class="promedios-hdr">📊 Tiempos promedio por etapa</div>
+        <div class="promedios-grid">${items.join('')}</div>
+      </div>
+    `;
+  },
+
+  _calcDuration(fi, hi, ff, hf) {
+    if (!fi || !ff) return '—';
+    const start = new Date(`${fi}T${hi || '00:00'}`);
+    const end   = new Date(`${ff}T${hf || '00:00'}`);
+    const mins  = Math.round((end - start) / 60000);
+    if (isNaN(mins) || mins <= 0) return '—';
+    return this._fmtMins(mins);
+  },
+
+  _fmtMins(mins) {
+    if (!mins || mins <= 0) return '—';
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h >= 24) {
+      const d  = Math.floor(h / 24);
+      const rh = h % 24;
+      return rh ? `${d}d ${rh}h` : `${d}d`;
+    }
+    if (h === 0) return `${m}min`;
+    return m === 0 ? `${h}h` : `${h}h ${m}min`;
+  },
+
+  // ── Completed table ───────────────────────────────────────────
   _renderCompletedTable(log) {
     return `
       <table class="completed-table">

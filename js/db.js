@@ -127,6 +127,10 @@ const DB = {
     return this._q(sb => sb.from('tiempos_op').select('*').eq('op_id', opId));
   },
 
+  async getAllTiempos() {
+    return this._q(sb => sb.from('tiempos_op').select('*'));
+  },
+
   async upsertTiempo({ op_id, nombre_op, etapa, fecha_inicio, hora_inicio, fecha_fin, hora_fin }) {
     return this._q(sb => sb.from('tiempos_op').upsert(
       { op_id, nombre_op, etapa, fecha_inicio, hora_inicio, fecha_fin, hora_fin,
