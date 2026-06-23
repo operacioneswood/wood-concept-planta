@@ -130,6 +130,7 @@ const Proyectos = {
           <button class="btn-contratista ${ct ? 'active' : ''}" data-op="${esc(op.id)}">
             ${ct ? '🔧 ' + esc(ct.name || 'Contratista') : '+ Contratista'}
           </button>
+          <button class="btn-tiempos btn-secondary btn-sm" data-op="${esc(op.id)}">⏱ Tiempos</button>
         </div>
 
         <div class="contratista-panel" id="ct-panel-${esc(op.id)}" ${ct ? '' : 'style="display:none"'}>
@@ -229,6 +230,14 @@ const Proyectos = {
       btn.addEventListener('click', () => {
         Storage.setContratista(btn.dataset.op, null);
         App.rerender();
+      });
+    });
+
+    // ⏱ Tiempos
+    document.querySelectorAll('.btn-tiempos').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const op = ops.find(o => o.id === btn.dataset.op);
+        if (op) Tiempos.open(op);
       });
     });
   },

@@ -1075,3 +1075,49 @@ body {
 .tablet .panel-btn-cerrar {
   font-size: 13px; padding: 6px 12px; min-height: 38px; border-radius: 8px;
 }
+
+/* ════════════════════════════════════════════════════════════
+   TIEMPOS MODAL
+   ════════════════════════════════════════════════════════════ */
+.modal-tiempos { max-width: 680px; width: 95vw; }
+.tiempos-op-label {
+  flex: 1; padding: 0 12px;
+  font-size: 12px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tiempos-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px; margin-bottom: 4px;
+}
+.tiempos-table th {
+  background: var(--divider);
+  padding: 7px 8px; text-align: left;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted);
+}
+.t-th-group { text-align: center !important; }
+.t-subhdr th {
+  background: var(--bg);
+  font-size: 10px; padding: 3px 8px;
+  font-weight: 500; text-transform: none; letter-spacing: 0;
+}
+.tiempos-table td { padding: 5px 6px; border-bottom: 1px solid var(--divider); }
+.tiempos-table tr:last-child td { border-bottom: none; }
+.t-etapa-lbl { font-weight: 600; white-space: nowrap; min-width: 90px; }
+.t-inp {
+  width: 100%; border: 1px solid var(--border);
+  border-radius: 5px; padding: 4px 6px;
+  font-size: 12px; font-family: inherit;
+  background: var(--card); color: var(--text);
+}
+.t-inp:focus { outline: none; border-color: var(--blue); }
+.t-dur {
+  color: var(--green); font-size: 12px; font-weight: 700;
+  white-space: nowrap; text-align: right; min-width: 56px; padding-right: 4px;
+}
+
+/* Tablet */
+.tablet .modal-tiempos { max-width: 95vw; }
+.tablet .t-inp { min-height: 40px; font-size: 14px !important; }
+.tablet .tiempos-table td { padding: 7px 6px; }

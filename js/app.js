@@ -39,6 +39,7 @@ const App = {
     this._setupNav();
     this._setupSettings();
     this._setupCompleteModal();
+    this._setupTiemposModal();
 
     // Load Supabase data in parallel with ClickUp cache render
     this._dbData = { asignaciones: [], prioridades: [], produccion: [], personas: [] };
@@ -395,6 +396,16 @@ const App = {
       console.warn('[App] ClickUp status update failed:', e.message);
       // Non-fatal — OP will drop from list on next natural sync
     }
+  },
+};
+
+  _setupTiemposModal() {
+    el('btn-tiempos-close')?.addEventListener('click',  () => Tiempos.close());
+    el('btn-tiempos-cancel')?.addEventListener('click', () => Tiempos.close());
+    el('btn-tiempos-save')?.addEventListener('click',   () => Tiempos.save());
+    el('tiempos-overlay')?.addEventListener('click', e => {
+      if (e.target === el('tiempos-overlay')) Tiempos.close();
+    });
   },
 };
 

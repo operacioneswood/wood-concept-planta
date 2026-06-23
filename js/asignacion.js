@@ -169,6 +169,7 @@ const Asignacion = {
           <input type="date" class="asign-date" data-op="${esc(op.id)}">
           <button class="btn-save-asign btn-primary btn-sm" data-op="${esc(op.id)}">✓</button>
           <button class="btn-complete-op btn-secondary btn-sm" data-op="${esc(op.id)}" data-name="${esc(op.name)}">✔ Listo</button>
+          <button class="btn-tiempos-asign btn-secondary btn-sm" data-op="${esc(op.id)}">⏱</button>
         </div>
       </div>
     `;
@@ -262,6 +263,14 @@ const Asignacion = {
     document.querySelectorAll('.btn-complete-op').forEach(btn => {
       btn.addEventListener('click', () => {
         App.openCompleteModal(btn.dataset.op, btn.dataset.name, ebanistas);
+      });
+    });
+
+    // ── ⏱ Tiempos ─────────────────────────────────────────────
+    document.querySelectorAll('.btn-tiempos-asign').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const op = App._data?.ops.find(o => o.id === btn.dataset.op);
+        if (op) Tiempos.open(op);
       });
     });
 

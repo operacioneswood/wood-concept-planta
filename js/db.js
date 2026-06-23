@@ -121,6 +121,21 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
+  // TIEMPOS_OP  (manual time registration per stage)
+  // ════════════════════════════════════════════════════════
+  async getTiempos(opId) {
+    return this._q(sb => sb.from('tiempos_op').select('*').eq('op_id', opId));
+  },
+
+  async upsertTiempo({ op_id, nombre_op, etapa, fecha_inicio, hora_inicio, fecha_fin, hora_fin }) {
+    return this._q(sb => sb.from('tiempos_op').upsert(
+      { op_id, nombre_op, etapa, fecha_inicio, hora_inicio, fecha_fin, hora_fin,
+        updated_at: new Date().toISOString() },
+      { onConflict: 'op_id,etapa' }
+    ));
+  },
+
+  // ════════════════════════════════════════════════════════
   // SETUP — create tables if they don't exist (run once)
   // ════════════════════════════════════════════════════════
   async setupTables() {
