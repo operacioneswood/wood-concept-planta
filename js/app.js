@@ -397,7 +397,6 @@ const App = {
       // Non-fatal — OP will drop from list on next natural sync
     }
   },
-};
 
   _setupTiemposModal() {
     el('btn-tiempos-close')?.addEventListener('click',  () => Tiempos.close());
@@ -407,6 +406,7 @@ const App = {
       if (e.target === el('tiempos-overlay')) Tiempos.close();
     });
   },
+};
 };
 
 document.addEventListener('DOMContentLoaded', () => App.init());
