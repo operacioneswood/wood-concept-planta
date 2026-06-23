@@ -239,9 +239,9 @@ const Asignacion = {
         const date   = card.querySelector('.asign-date').value;
         if (!person) return;
 
-        // Add to cache (upsert by op+persona)
+        // Add to cache (upsert by op+persona+stage — keep other stages for same person)
         App._dbData.asignaciones = App._dbData.asignaciones.filter(
-          a => !(a.op_id === opId && a.persona === person)
+          a => !(a.op_id === opId && a.persona === person && a.etapa === (stage || '_'))
         );
         App._dbData.asignaciones.push({
           op_id: opId, etapa: stage || '_', persona: person,
