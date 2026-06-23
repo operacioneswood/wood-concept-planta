@@ -621,7 +621,7 @@ body {
 /* ════════════════════════════════════════════════════════════
    ASIGNACIÓN — SEARCH BAR
    ════════════════════════════════════════════════════════════ */
-.asign-search-wrap { margin-bottom: 16px; }
+.asign-search-wrap { margin-bottom: 16px; display: flex; gap: 8px; align-items: stretch; }
 .asign-search-input {
   width: 100%; border: 1px solid var(--border);
   border-radius: 8px; padding: 8px 14px;
@@ -1033,52 +1033,25 @@ body {
 .tablet input[type="radio"],
 .tablet input[type="checkbox"] { width: 20px; height: 20px; cursor: pointer; }
 
-/* ════════════════════════════════════════════════════════════
-   OPs ACTIVAS SUMMARY (Asignación tab)
-   ════════════════════════════════════════════════════════════ */
-.aa-section {
-  border: 1.5px solid var(--accent);
-  border-radius: var(--r);
-  margin-bottom: 18px;
-  overflow: hidden;
+/* ── Asignación filter button ── */
+.asign-filter-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); background: var(--card);
+  border-radius: 6px; padding: 0 12px;
+  font-family: inherit; font-size: 12px; font-weight: 500;
+  color: var(--muted); cursor: pointer; white-space: nowrap;
+  transition: background .15s, color .15s, border-color .15s;
+  flex-shrink: 0;
 }
-.aa-hdr {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 16px;
-  cursor: pointer; user-select: none;
-  background: var(--accent-bg);
-  font-weight: 600; font-size: 13px;
+.asign-filter-btn:hover { background: var(--divider); color: var(--text); }
+.asign-filter-btn.asign-filter-on {
+  background: var(--accent-bg); color: var(--accent); border-color: var(--accent);
 }
-.aa-hdr:hover { filter: brightness(0.97); }
-.aa-hdr-title { color: var(--accent); }
-.aa-count {
+.asign-filter-count {
   background: var(--accent); color: #fff;
-  font-size: 11px; font-weight: 700;
-  border-radius: 10px; padding: 1px 7px;
+  font-size: 10px; font-weight: 700;
+  border-radius: 8px; padding: 1px 6px;
 }
-.aa-arrow { margin-left: auto; color: var(--muted); font-size: 11px; }
-.aa-body { background: var(--card); }
-.aa-row {
-  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
-  padding: 7px 16px;
-  border-bottom: 1px solid var(--divider);
-  font-size: 12px; cursor: pointer;
-}
-.aa-row:last-child { border-bottom: none; }
-.aa-row:hover { background: var(--accent-bg); }
-.aa-proj {
-  font-size: 11px; color: var(--muted);
-  background: var(--divider); border-radius: 4px; padding: 1px 5px;
-  white-space: nowrap;
-}
-.aa-name { color: var(--text); flex: 1; min-width: 100px; }
-.aa-chips { display: flex; gap: 5px; flex-wrap: wrap; }
-.aa-chip {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: var(--divider); border-radius: 20px;
-  padding: 1px 8px; font-size: 11px; color: var(--text);
-}
-.aa-chip-stage { font-weight: 600; }
 
 /* ════════════════════════════════════════════════════════════
    PANEL ACTION BUTTONS (Fin / Cerrar per task row)

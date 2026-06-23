@@ -7,9 +7,10 @@
 // ─────────────────────────────────────────────────────────────
 
 const Asignacion = {
-  _collapsed: new Set(),
-  _ebanistas: [],
-  _fieldIds:  {},
+  _collapsed:    new Set(),
+  _ebanistas:    [],
+  _fieldIds:     {},
+  _filterActive: false,
 
   render({ ops, ebanistas, dbData, fieldIds }) {
     this._ebanistas = ebanistas;
@@ -29,11 +30,15 @@ const Asignacion = {
       this._renderGroup(proj, projOps, assignments, ebanistas)
     ).join('');
 
+    const activeCount = ops.filter(op => (assignments[op.id] || []).length > 0).length;
+
     body.innerHTML = `
       <div class="asign-search-wrap">
         <input type="search" id="asign-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre...">
+        <button class="asign-filter-btn ${this._filterActive ? 'asign-filter-on' : ''}" id="asign-filter-btn" type="button">
+          Activas <span class="asign-filter-count">${activeCount}</span>
+        </button>
       </div>
-      ${this._renderActiveSection(ops, assignments)}
       ${groupsHtml}
     `;
 
@@ -53,42 +58,6 @@ const Asignacion = {
     }
     // Restore scroll position after paint
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
-  },
-
-  _renderActiveSection(ops, assignments) {
-    const activeOps = ops.filter(op => (assignments[op.id] || []).length > 0);
-    if (!activeOps.length) return '';
-
-    const rows = activeOps.map(op => {
-      const opAssigns = assignments[op.id] || [];
-      const chips = opAssigns.map(a => {
-        const stageLabel = a.stage && a.stage !== '_' ? (STAGE_LABELS[a.stage] || a.stage) : '';
-        const color = stageLabel && a.stage ? (STAGE_COLORS[a.stage] || 'inherit') : 'inherit';
-        return `<span class="aa-chip">${esc(a.person)}${stageLabel
-          ? `<span class="aa-chip-stage" style="color:${color}"> · ${esc(stageLabel)}</span>`
-          : ''}</span>`;
-      }).join('');
-
-      return `
-        <div class="aa-row" data-op-ref="${esc(op.id)}" title="Ir al OP">
-          ${op.noOp ? `<span class="asign-op-num">${esc(op.noOp)}</span>` : ''}
-          ${op.project ? `<span class="aa-proj">${esc(op.project)}</span>` : ''}
-          <span class="aa-name">${esc(op.name)}</span>
-          <div class="aa-chips">${chips}</div>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div class="aa-section">
-        <div class="aa-hdr" id="aa-hdr">
-          <span class="aa-hdr-title">OPs activas</span>
-          <span class="aa-count">${activeOps.length}</span>
-          <span class="aa-arrow">▼</span>
-        </div>
-        <div class="aa-body" id="aa-body">${rows}</div>
-      </div>
-    `;
   },
 
   _groupByProject(ops, priority) {
@@ -206,19 +175,32 @@ const Asignacion = {
   },
 
   _bindSearch() {
-    const input = document.getElementById('asign-search');
-    if (!input) return;
-    input.addEventListener('input', () => {
-      const q = input.value.toLowerCase().trim();
+    const searchInput = document.getElementById('asign-search');
+    const filterBtn   = document.getElementById('asign-filter-btn');
+
+    const applyFilters = () => {
+      const q = searchInput?.value.toLowerCase().trim() || '';
       document.querySelectorAll('.asign-card').forEach(card => {
-        const match = !q || (card.dataset.search || '').includes(q);
-        card.style.display = match ? '' : 'none';
+        const matchSearch = !q || (card.dataset.search || '').includes(q);
+        const matchFilter = !this._filterActive || card.classList.contains('asign-row-assigned');
+        card.style.display = (matchSearch && matchFilter) ? '' : 'none';
       });
       document.querySelectorAll('.asign-group').forEach(group => {
         const anyVisible = [...group.querySelectorAll('.asign-card')].some(c => c.style.display !== 'none');
         group.style.display = anyVisible ? '' : 'none';
       });
+    };
+
+    searchInput?.addEventListener('input', applyFilters);
+
+    filterBtn?.addEventListener('click', () => {
+      this._filterActive = !this._filterActive;
+      filterBtn.classList.toggle('asign-filter-on', this._filterActive);
+      applyFilters();
     });
+
+    // Re-apply on rerender if filter/search was active
+    if (this._filterActive || searchInput?.value) applyFilters();
   },
 
   _bindEvents(ops, ebanistas, fieldIds) {
@@ -242,22 +224,6 @@ const Asignacion = {
           body.classList.add('proj-group-collapsed');
           if (arrow) arrow.textContent = '▶';
         }
-      });
-    });
-
-    // ── OPs activas: toggle + scroll-to-card ─────────────────
-    el('aa-hdr')?.addEventListener('click', () => {
-      const body  = el('aa-body');
-      const arrow = el('aa-hdr')?.querySelector('.aa-arrow');
-      if (!body) return;
-      const hidden = body.style.display === 'none';
-      body.style.display = hidden ? '' : 'none';
-      if (arrow) arrow.textContent = hidden ? '▼' : '▶';
-    });
-    document.querySelectorAll('.aa-row').forEach(row => {
-      row.addEventListener('click', () => {
-        const card = document.querySelector(`.asign-card[data-op-id="${row.dataset.opRef}"]`);
-        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     });
 
