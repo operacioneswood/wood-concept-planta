@@ -312,6 +312,16 @@ body {
 }
 .panel-task-row:last-child { border-bottom: none; }
 .panel-task-current .panel-task-name { font-weight: 600; }
+.panel-drag-handle {
+  cursor: grab; color: var(--text-muted); font-size: 14px;
+  padding: 0 2px; user-select: none; flex-shrink: 0; opacity: 0.45;
+}
+.panel-task-row:hover .panel-drag-handle { opacity: 0.9; }
+.panel-task-row.panel-dragging { opacity: 0.35; }
+.panel-task-row.panel-drag-over {
+  border-top: 2px solid var(--accent);
+  margin-top: -1px;
+}
 .panel-task-num {
   min-width: 18px; height: 18px; border-radius: 50%;
   background: var(--divider); color: var(--muted);
@@ -966,6 +976,7 @@ body {
 .tablet .panel-table-head,
 .tablet .panel-row { padding: 12px 16px; }
 .tablet .panel-task-row { padding: 8px 0; gap: 10px; min-height: 36px; }
+.tablet .panel-drag-handle { font-size: 18px; padding: 0 4px; }
 
 /* ── Asignación search ── */
 .tablet .asign-search-input { min-height: 48px; border-radius: 10px; }

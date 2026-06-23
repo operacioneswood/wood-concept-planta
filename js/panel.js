@@ -54,6 +54,8 @@ const Panel = {
       ${pintoresData.length     ? this._renderSection('Pintores', pintoresData, assignments) : ''}
       ${ops.length === 0 ? '<div class="empty-state"><div class="empty-icon">🏭</div><p>Sin OPs activos en planta.</p><p class="muted">Verifica la conexión en ⚙ Configuración.</p></div>' : ''}
     `;
+
+    this._bindDrag();
   },
 
   _renderSection(title, people, assignments) {
@@ -75,13 +77,26 @@ const Panel = {
   _renderRow({ name, myOps }, assignments) {
     const noWork = myOps.length === 0;
 
-    const taskList = myOps.map((op, idx) => {
+    // Sort by saved drag order for this person
+    const savedOrder = this._getOrder(name);
+    const orderedOps = savedOrder.length
+      ? [...myOps].sort((a, b) => {
+          const ai = savedOrder.indexOf(a.id);
+          const bi = savedOrder.indexOf(b.id);
+          return (ai === -1 ? 9999 : ai) - (bi === -1 ? 9999 : bi);
+        })
+      : myOps;
+
+    const taskList = orderedOps.map((op, idx) => {
       const a     = (assignments[op.id] || []).find(x => x.person === name);
       const stage = a?.stage ? STAGE_LABELS[a.stage] : null;
       const color = a?.stage ? STAGE_COLORS[a.stage] : null;
       return `
-        <div class="panel-task-row ${idx === 0 ? 'panel-task-current' : ''}">
-          <span class="panel-task-num">${idx + 1}</span>
+        <div class="panel-task-row ${idx === 0 ? 'panel-task-current' : ''}"
+             draggable="true"
+             data-drag-person="${esc(name)}"
+             data-drag-opid="${esc(op.id)}">
+          <span class="panel-drag-handle" title="Arrastrar para reordenar">⠿</span>
           ${op.noOp ? `<span class="panel-op-num">${esc(op.noOp)}</span>` : ''}
           ${op.project ? `<span class="panel-proj-lbl">${esc(op.project)}</span>` : ''}
           <span class="panel-task-name">${esc(op.name)}</span>
@@ -108,5 +123,73 @@ const Panel = {
   _statusBadge(status) {
     const info = STATUS_DISPLAY[status] || { label: status || '—', cls: 'sb-other' };
     return `<span class="status-badge ${info.cls}">${esc(info.label)}</span>`;
+  },
+
+  // ── Drag order persistence ────────────────────────────────
+  _getOrder(name) {
+    try { return JSON.parse(localStorage.getItem('wp_panel_order_' + name)) || []; }
+    catch { return []; }
+  },
+
+  _setOrder(name, ids) {
+    localStorage.setItem('wp_panel_order_' + name, JSON.stringify(ids));
+  },
+
+  // ── Drag-to-reorder ──────────────────────────────────────
+  _bindDrag() {
+    let dragged = null;
+
+    document.querySelectorAll('.panel-task-row[draggable]').forEach(row => {
+      row.addEventListener('dragstart', e => {
+        dragged = row;
+        row.classList.add('panel-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+      });
+
+      row.addEventListener('dragend', () => {
+        if (dragged) dragged.classList.remove('panel-dragging');
+        document.querySelectorAll('.panel-task-row.panel-drag-over')
+          .forEach(r => r.classList.remove('panel-drag-over'));
+        dragged = null;
+      });
+
+      row.addEventListener('dragover', e => {
+        e.preventDefault();
+        if (!dragged || row === dragged) return;
+        if (row.dataset.dragPerson !== dragged.dataset.dragPerson) return;
+        document.querySelectorAll('.panel-task-row.panel-drag-over')
+          .forEach(r => r.classList.remove('panel-drag-over'));
+        row.classList.add('panel-drag-over');
+      });
+
+      row.addEventListener('dragleave', () => row.classList.remove('panel-drag-over'));
+
+      row.addEventListener('drop', e => {
+        e.preventDefault();
+        row.classList.remove('panel-drag-over');
+        if (!dragged || row === dragged) return;
+        if (row.dataset.dragPerson !== dragged.dataset.dragPerson) return;
+
+        const person  = row.dataset.dragPerson;
+        const fromId  = dragged.dataset.dragOpid;
+        const toId    = row.dataset.dragOpid;
+
+        // Read current DOM order to build the new order
+        const container = row.closest('.panel-tasks-col');
+        if (!container) return;
+        const allRows = [...container.querySelectorAll('.panel-task-row[data-drag-opid]')];
+        const ids = allRows.map(r => r.dataset.dragOpid);
+
+        const fromIdx = ids.indexOf(fromId);
+        const toIdx   = ids.indexOf(toId);
+        if (fromIdx === -1 || toIdx === -1) return;
+
+        ids.splice(fromIdx, 1);
+        ids.splice(toIdx, 0, fromId);
+
+        this._setOrder(person, ids);
+        App.renderPanel();
+      });
+    });
   },
 };

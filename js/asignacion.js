@@ -41,7 +41,17 @@ const Asignacion = {
   },
 
   _rerender() {
+    const searchVal = document.getElementById('asign-search')?.value || '';
+    const scrollY   = window.scrollY;
     App.renderAsignacion();
+    // Restore search filter
+    const input = document.getElementById('asign-search');
+    if (input && searchVal) {
+      input.value = searchVal;
+      input.dispatchEvent(new Event('input'));
+    }
+    // Restore scroll position after paint
+    requestAnimationFrame(() => window.scrollTo(0, scrollY));
   },
 
   _groupByProject(ops, priority) {
@@ -80,7 +90,9 @@ const Asignacion = {
   _renderRow(op, assignments, ebanistas) {
     const opAssigns  = assignments[op.id] || [];
     const isAssigned = opAssigns.length > 0;
-    const stage      = getCurrentStage(op);
+    const stage      = getCurrentStage(op)
+      || opAssigns.find(a => a.stage && a.stage !== '_' && a.stage !== 'reproceso')?.stage
+      || null;
     const hasRepro   = !!op.inicioReproceso && !op.finReproceso;
 
     const personOpts = ebanistas.map(n =>
@@ -121,7 +133,7 @@ const Asignacion = {
             ${stage
               ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>`
               : '<span class="muted-txt">—</span>'}
-            <button class="btn-stage-inicio btn-sm" data-op="${esc(op.id)}" title="Marcar inicio de etapa hoy">▶ Inicio</button>
+            <button class="btn-stage-inicio btn-sm" data-op="${esc(op.id)}" data-stage="${esc(stage || '')}" title="Marcar inicio de etapa hoy">▶ Inicio</button>
             ${(() => {
               if (!stage) return '';
               const finKey   = STAGE_FIN[stage];
@@ -346,8 +358,8 @@ const Asignacion = {
       btn.addEventListener('click', async () => {
         const opId  = btn.dataset.op;
         const op    = App._data?.ops.find(o => o.id === opId);
-        const stage = getCurrentStage(op);
-        if (!stage) { alert('No hay etapa activa para este OP'); return; }
+        const stage = btn.dataset.stage || getCurrentStage(op);
+        if (!stage) { alert('No hay etapa asignada para este OP'); return; }
 
         const dateKey = STAGE_INICIO[stage];
         const fieldId = fieldIds?.[dateKey];
