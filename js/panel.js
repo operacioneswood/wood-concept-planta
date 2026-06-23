@@ -3,8 +3,10 @@
 // ─────────────────────────────────────────────────────────────
 
 const Panel = {
+  _fieldIds: {},
 
-  render({ ops, ebanistas, dbData }) {
+  render({ ops, ebanistas, dbData, fieldIds }) {
+    this._fieldIds = fieldIds || {};
     const assignments = App.buildAssignments(dbData);
     const personasMap = App.buildPersonasMap(dbData);
 
@@ -20,12 +22,10 @@ const Panel = {
     const contratistasData = personData.filter(p => p.role === 'contratista');
     const unknownData      = personData.filter(p => !personasMap[p.name]);
 
-    // Only plant employees count for "sin trabajo" alerts
     const plantaPeople  = [...ebanistasData, ...pintoresData, ...(ebanistasData.length ? [] : unknownData)];
     const unassignedOps = ops.filter(op => !(assignments[op.id]?.length > 0));
     const noWorkPeople  = plantaPeople.filter(p => p.myOps.length === 0);
 
-    // Metrics strip
     el('panel-metrics').innerHTML = `
       <div class="metric-card">
         <div class="metric-val">${ops.length}</div>
@@ -45,7 +45,6 @@ const Panel = {
       </div>
     `;
 
-    // Body
     const noWorkNames = noWorkPeople.map(p => esc(p.name)).join(', ');
     el('panel-body').innerHTML = `
       ${noWorkPeople.length ? `<div class="panel-alert-banner">⚠ Sin asignación: ${noWorkNames}</div>` : ''}
@@ -56,6 +55,7 @@ const Panel = {
     `;
 
     this._bindDrag();
+    this._bindActions();
   },
 
   _renderSection(title, people, assignments) {
@@ -77,7 +77,7 @@ const Panel = {
   _renderRow({ name, myOps }, assignments) {
     const noWork = myOps.length === 0;
 
-    // Sort by saved drag order for this person
+    // Sort by saved drag order
     const savedOrder = this._getOrder(name);
     const orderedOps = savedOrder.length
       ? [...myOps].sort((a, b) => {
@@ -88,9 +88,19 @@ const Panel = {
       : myOps;
 
     const taskList = orderedOps.map((op, idx) => {
-      const a     = (assignments[op.id] || []).find(x => x.person === name);
-      const stage = a?.stage ? STAGE_LABELS[a.stage] : null;
-      const color = a?.stage ? STAGE_COLORS[a.stage] : null;
+      const a             = (assignments[op.id] || []).find(x => x.person === name);
+      const stageId       = a?.stage && a.stage !== '_' && a.stage !== 'reproceso' ? a.stage : null;
+      const stageLabel    = stageId ? STAGE_LABELS[stageId] : null;
+      const stageColor    = stageId ? STAGE_COLORS[stageId] : null;
+
+      // ✓ Cerrar button: only when inicio set, fin not set, fieldId known
+      const inicioKey    = stageId ? STAGE_INICIO[stageId] : null;
+      const finKey       = stageId ? STAGE_FIN[stageId] : null;
+      const stageStarted = inicioKey && op[inicioKey];
+      const stageClosed  = finKey && op[finKey];
+      const fieldId      = finKey ? (this._fieldIds[finKey] || '') : '';
+      const showCerrar   = stageStarted && !stageClosed && fieldId;
+
       return `
         <div class="panel-task-row ${idx === 0 ? 'panel-task-current' : ''}"
              draggable="true"
@@ -100,8 +110,22 @@ const Panel = {
           ${op.noOp ? `<span class="panel-op-num">${esc(op.noOp)}</span>` : ''}
           ${op.project ? `<span class="panel-proj-lbl">${esc(op.project)}</span>` : ''}
           <span class="panel-task-name">${esc(op.name)}</span>
-          ${stage ? `<span class="stage-pill-sm" style="color:${color}">${esc(stage)}</span>` : ''}
-          ${this._statusBadge(op.status)}
+          ${stageLabel ? `<span class="stage-pill-sm" style="color:${stageColor}">${esc(stageLabel)}</span>` : ''}
+          <div class="panel-task-actions">
+            ${stageId ? `
+              <button class="panel-btn-fin"
+                data-op="${esc(op.id)}"
+                data-person="${esc(name)}"
+                data-stage="${esc(stageId)}">■ Fin</button>
+            ` : ''}
+            ${showCerrar ? `
+              <button class="panel-btn-cerrar"
+                data-op="${esc(op.id)}"
+                data-stage="${esc(stageId)}"
+                data-fieldid="${esc(fieldId)}"
+                data-datekey="${esc(finKey)}">✓ Cerrar</button>
+            ` : ''}
+          </div>
         </div>
       `;
     }).join('');
@@ -118,11 +142,6 @@ const Panel = {
         </div>
       </div>
     `;
-  },
-
-  _statusBadge(status) {
-    const info = STATUS_DISPLAY[status] || { label: status || '—', cls: 'sb-other' };
-    return `<span class="status-badge ${info.cls}">${esc(info.label)}</span>`;
   },
 
   // ── Drag order persistence ────────────────────────────────
@@ -172,16 +191,14 @@ const Panel = {
 
         const person  = row.dataset.dragPerson;
         const fromId  = dragged.dataset.dragOpid;
-        const toId    = row.dataset.dragOpid;
 
-        // Read current DOM order to build the new order
         const container = row.closest('.panel-tasks-col');
         if (!container) return;
         const allRows = [...container.querySelectorAll('.panel-task-row[data-drag-opid]')];
         const ids = allRows.map(r => r.dataset.dragOpid);
 
         const fromIdx = ids.indexOf(fromId);
-        const toIdx   = ids.indexOf(toId);
+        const toIdx   = ids.indexOf(row.dataset.dragOpid);
         if (fromIdx === -1 || toIdx === -1) return;
 
         ids.splice(fromIdx, 1);
@@ -189,6 +206,80 @@ const Panel = {
 
         this._setOrder(person, ids);
         App.renderPanel();
+      });
+    });
+  },
+
+  // ── Fin / Cerrar actions ─────────────────────────────────
+  _bindActions() {
+    // ■ Fin — logs historial, removes assignment
+    document.querySelectorAll('.panel-btn-fin').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const opId   = btn.dataset.op;
+        const person = btn.dataset.person;
+        const stage  = btn.dataset.stage;
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+
+        try {
+          const op         = App._data?.ops.find(o => o.id === opId);
+          const today      = todayIso();
+          const inicioKey  = STAGE_INICIO[stage];
+          const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
+
+          const histEntry = {
+            op_id: opId, etapa: stage, persona: person,
+            fecha_inicio: fechaInicio, fecha_fin: today,
+            es_reproceso: false, comentario: '',
+          };
+          App._dbData.historial = (App._dbData.historial || []).filter(
+            h => !(h.op_id === opId && h.etapa === stage && h.persona === person)
+          );
+          App._dbData.historial.unshift(histEntry);
+          DB.upsertHistorial(histEntry).catch(e => console.warn('[Panel] historial:', e.message));
+
+          App._dbData.asignaciones = App._dbData.asignaciones.filter(
+            a => !(a.op_id === opId && a.persona === person)
+          );
+          DB.removeAsignacion(opId, person).catch(e => console.warn('[Panel] remove:', e.message));
+
+          App.renderPanel();
+          Proyectos.render({ ...App._data, dbData: App._dbData });
+          Asignacion._rerender();
+        } catch (e) {
+          alert('Error: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
+
+    // ✓ Cerrar etapa — sets ClickUp fin date
+    document.querySelectorAll('.panel-btn-cerrar').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const opId   = btn.dataset.op;
+        const stage  = btn.dataset.stage;
+        const fieldId = btn.dataset.fieldid;
+        const dateKey = btn.dataset.datekey;
+        const label  = STAGE_LABELS[stage] || stage;
+
+        if (!confirm(`¿Confirmar cierre de ${label}?\nEsto marcará la fecha de fin en ClickUp.`)) return;
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+
+        try {
+          const op = App._data?.ops.find(o => o.id === opId);
+          await PlantaAPI.setField(opId, fieldId, Date.now());
+          if (op) op[dateKey] = new Date();
+          PlantaAPI.clearCache();
+          App.renderPanel();
+          Proyectos.render({ ...App._data, dbData: App._dbData });
+          Asignacion._rerender();
+        } catch (e) {
+          alert('Error al cerrar etapa: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
       });
     });
   },

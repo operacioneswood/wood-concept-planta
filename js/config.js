@@ -42,9 +42,9 @@ const CONTRATISTAS_CONOCIDOS = new Set([
 ]);
 
 // ── Default ClickUp connection ────────────────────────────────
-// Credentials are stored in localStorage (set via ⚙ Configuración).
-// Never hardcode the API key here — this file is public in GitHub.
-const DEFAULT_API_KEY = '';
+// Key stored in localStorage takes priority over this default.
+// Note: this file is in GitHub — keep repo private if this key is sensitive.
+const DEFAULT_API_KEY = 'pk_88470791_HQLTVBC5M58X1SD3H6BHDSYQFLIX931H';
 const DEFAULT_LIST_ID = '90090072307';
 
 // ── Shared utilities ──────────────────────────────────────────

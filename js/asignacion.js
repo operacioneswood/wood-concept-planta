@@ -33,6 +33,7 @@ const Asignacion = {
       <div class="asign-search-wrap">
         <input type="search" id="asign-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre...">
       </div>
+      ${this._renderActiveSection(ops, assignments)}
       ${groupsHtml}
     `;
 
@@ -52,6 +53,42 @@ const Asignacion = {
     }
     // Restore scroll position after paint
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
+  },
+
+  _renderActiveSection(ops, assignments) {
+    const activeOps = ops.filter(op => (assignments[op.id] || []).length > 0);
+    if (!activeOps.length) return '';
+
+    const rows = activeOps.map(op => {
+      const opAssigns = assignments[op.id] || [];
+      const chips = opAssigns.map(a => {
+        const stageLabel = a.stage && a.stage !== '_' ? (STAGE_LABELS[a.stage] || a.stage) : '';
+        const color = stageLabel && a.stage ? (STAGE_COLORS[a.stage] || 'inherit') : 'inherit';
+        return `<span class="aa-chip">${esc(a.person)}${stageLabel
+          ? `<span class="aa-chip-stage" style="color:${color}"> · ${esc(stageLabel)}</span>`
+          : ''}</span>`;
+      }).join('');
+
+      return `
+        <div class="aa-row" data-op-ref="${esc(op.id)}" title="Ir al OP">
+          ${op.noOp ? `<span class="asign-op-num">${esc(op.noOp)}</span>` : ''}
+          ${op.project ? `<span class="aa-proj">${esc(op.project)}</span>` : ''}
+          <span class="aa-name">${esc(op.name)}</span>
+          <div class="aa-chips">${chips}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="aa-section">
+        <div class="aa-hdr" id="aa-hdr">
+          <span class="aa-hdr-title">OPs activas</span>
+          <span class="aa-count">${activeOps.length}</span>
+          <span class="aa-arrow">▼</span>
+        </div>
+        <div class="aa-body" id="aa-body">${rows}</div>
+      </div>
+    `;
   },
 
   _groupByProject(ops, priority) {
@@ -205,6 +242,22 @@ const Asignacion = {
           body.classList.add('proj-group-collapsed');
           if (arrow) arrow.textContent = '▶';
         }
+      });
+    });
+
+    // ── OPs activas: toggle + scroll-to-card ─────────────────
+    el('aa-hdr')?.addEventListener('click', () => {
+      const body  = el('aa-body');
+      const arrow = el('aa-hdr')?.querySelector('.aa-arrow');
+      if (!body) return;
+      const hidden = body.style.display === 'none';
+      body.style.display = hidden ? '' : 'none';
+      if (arrow) arrow.textContent = hidden ? '▼' : '▶';
+    });
+    document.querySelectorAll('.aa-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const card = document.querySelector(`.asign-card[data-op-id="${row.dataset.opRef}"]`);
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     });
 
