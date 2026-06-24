@@ -1,9 +1,5 @@
 // ─────────────────────────────────────────────────────────────
 // js/asignacion.js — Asignación tab: assign people+stage to OPs
-//   Multiple people can be assigned to the same OP.
-//   Each person has a comment for what they worked on.
-//   ▶ Inicio = OP-level (first sets the date, others skip)
-//   ■ Fin    = per-person chip (saves historial + removes chip)
 // ─────────────────────────────────────────────────────────────
 
 const Asignacion = {
@@ -50,13 +46,11 @@ const Asignacion = {
     const searchVal = document.getElementById('asign-search')?.value || '';
     const scrollY   = window.scrollY;
     App.renderAsignacion();
-    // Restore search filter
     const input = document.getElementById('asign-search');
     if (input && searchVal) {
       input.value = searchVal;
       input.dispatchEvent(new Event('input'));
     }
-    // Restore scroll position after paint
     requestAnimationFrame(() => window.scrollTo(0, scrollY));
   },
 
@@ -111,17 +105,22 @@ const Asignacion = {
       `<option value="reproceso">Reproceso</option>`,
     ].join('');
 
-    const chips = opAssigns.map(a => `
-      <div class="asign-chip" data-op="${esc(op.id)}" data-person="${esc(a.person)}">
-        <span class="chip-name">${esc(a.person)}</span>
-        ${a.stage && a.stage !== '_' ? `<span class="chip-stage">${esc(STAGE_LABELS[a.stage] || a.stage)}</span>` : ''}
-        <input type="text" class="chip-comment"
-          data-op="${esc(op.id)}" data-person="${esc(a.person)}"
-          value="${esc(a.comentario || '')}" placeholder="Qué hizo...">
-        <button class="btn-chip-fin" data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">■ Fin</button>
-        <button class="btn-chip-remove" data-op="${esc(op.id)}" data-person="${esc(a.person)}">✕</button>
-      </div>
-    `).join('');
+    const chips = opAssigns.map(a => {
+      const subsList   = (a.subprocesos || '').split(',').filter(Boolean);
+      const subsLabels = subsList.map(id => subproLabel(id));
+      return `
+        <div class="asign-chip" data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">
+          <span class="chip-name">${esc(a.person)}</span>
+          ${a.stage && a.stage !== '_' ? `<span class="chip-stage">${esc(STAGE_LABELS[a.stage] || a.stage)}</span>` : ''}
+          ${subsLabels.length ? `<span class="chip-subs">${subsLabels.map(esc).join(', ')}</span>` : ''}
+          <input type="text" class="chip-comment"
+            data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}"
+            value="${esc(a.comentario || '')}" placeholder="Qué hizo...">
+          <button class="btn-chip-fin"    data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">■ Fin</button>
+          <button class="btn-chip-remove" data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">✕</button>
+        </div>
+      `;
+    }).join('');
 
     const searchText = `${op.project || ''} ${op.noOp || ''} ${op.name || ''}`.toLowerCase();
 
@@ -171,6 +170,7 @@ const Asignacion = {
           <button class="btn-complete-op btn-secondary btn-sm" data-op="${esc(op.id)}" data-name="${esc(op.name)}">✔ Listo</button>
           <button class="btn-tiempos-asign btn-secondary btn-sm" data-op="${esc(op.id)}">⏱</button>
         </div>
+        <div class="asign-subprocesos" id="asign-sub-${esc(op.id)}" style="display:none"></div>
       </div>
     `;
   },
@@ -200,7 +200,6 @@ const Asignacion = {
       applyFilters();
     });
 
-    // Re-apply on rerender if filter/search was active
     if (this._filterActive || searchInput?.value) applyFilters();
   },
 
@@ -228,6 +227,32 @@ const Asignacion = {
       });
     });
 
+    // ── Stage select → show sub-process checkboxes ────────────
+    document.querySelectorAll('.asign-stage').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const opId        = sel.dataset.op;
+        const stageVal    = sel.value;
+        const subContainer = document.getElementById(`asign-sub-${opId}`);
+        if (!subContainer) return;
+        const subs = STAGE_SUBPROCESOS[stageVal] || [];
+        if (!subs.length) {
+          subContainer.style.display = 'none';
+          subContainer.innerHTML = '';
+          return;
+        }
+        subContainer.style.display = 'flex';
+        subContainer.innerHTML = `
+          <span class="subpro-lbl">Subprocesos:</span>
+          ${subs.map(s => `
+            <label class="subpro-chk">
+              <input type="checkbox" class="subpro-input" value="${esc(s.id)}">
+              ${esc(s.label)}
+            </label>
+          `).join('')}
+        `;
+      });
+    });
+
     // ── Add person (✓) ────────────────────────────────────────
     document.querySelectorAll('.btn-save-asign').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -239,13 +264,19 @@ const Asignacion = {
         const date   = card.querySelector('.asign-date').value;
         if (!person) return;
 
-        // Add to cache (upsert by op+persona+stage — keep other stages for same person)
+        // Collect sub-processes
+        const subContainer = document.getElementById(`asign-sub-${opId}`);
+        const checkedSubs  = [...(subContainer?.querySelectorAll('.subpro-input:checked') || [])]
+          .map(c => c.value).join(',');
+
+        // Upsert in local cache (by op+persona+stage)
         App._dbData.asignaciones = App._dbData.asignaciones.filter(
           a => !(a.op_id === opId && a.persona === person && a.etapa === (stage || '_'))
         );
         App._dbData.asignaciones.push({
           op_id: opId, etapa: stage || '_', persona: person,
           fecha_asignacion: date || todayIso(), comentario: '',
+          subprocesos: checkedSubs,
         });
 
         App.renderPanel();
@@ -253,6 +284,10 @@ const Asignacion = {
 
         try {
           await DB.setAsignacion(opId, stage || '_', person, date || null, null);
+          if (checkedSubs) {
+            await DB.updateSubprocesos(opId, stage || '_', person, checkedSubs)
+              .catch(e => console.warn('[Asignacion] subprocesos column may not exist:', e.message));
+          }
         } catch (e) {
           console.error('[Asignacion] save failed:', e.message);
         }
@@ -279,8 +314,11 @@ const Asignacion = {
       input.addEventListener('change', async () => {
         const opId      = input.dataset.op;
         const person    = input.dataset.person;
+        const stage     = input.dataset.stage;
         const comentario = input.value;
-        const row = App._dbData.asignaciones.find(a => a.op_id === opId && a.persona === person);
+        const row = App._dbData.asignaciones.find(
+          a => a.op_id === opId && a.persona === person && a.etapa === stage
+        );
         if (row) row.comentario = comentario;
         try {
           if (row) await DB.setAsignacion(opId, row.etapa, person, row.fecha_asignacion, comentario);
@@ -312,7 +350,6 @@ const Asignacion = {
           const inicioKey   = STAGE_INICIO[stage];
           const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
 
-          // Save historial before removing assignment
           const histEntry = { op_id: opId, etapa: stage, persona: person, fecha_inicio: fechaInicio, fecha_fin: today, es_reproceso: false, comentario };
           App._dbData.historial = (App._dbData.historial || []).filter(
             h => !(h.op_id === opId && h.etapa === stage && h.persona === person)
@@ -320,19 +357,17 @@ const Asignacion = {
           App._dbData.historial.unshift(histEntry);
           DB.upsertHistorial(histEntry).catch(e => console.warn('[Asignacion] historial:', e.message));
 
-          // Remove this person's assignment — does NOT touch ClickUp fin date.
-          // Supervisor uses "✓ Cerrar [Etapa]" to officially close the stage.
           App._dbData.asignaciones = App._dbData.asignaciones.filter(
-            a => !(a.op_id === opId && a.persona === person)
+            a => !(a.op_id === opId && a.persona === person && a.etapa === stage)
           );
-          DB.removeAsignacion(opId, person).catch(e => console.warn('[Asignacion] remove:', e.message));
+          DB.removeAsignacion(opId, person, stage).catch(e => console.warn('[Asignacion] remove:', e.message));
 
           App.renderPanel();
           Proyectos.render({ ...App._data, dbData: App._dbData });
           rerender();
 
         } catch (e) {
-          alert('Error al actualizar ClickUp: ' + e.message);
+          alert('Error: ' + e.message);
           btn.textContent = orig; btn.disabled = false;
         }
       });
@@ -343,16 +378,17 @@ const Asignacion = {
       btn.addEventListener('click', () => {
         const opId   = btn.dataset.op;
         const person = btn.dataset.person;
+        const stage  = btn.dataset.stage;
         App._dbData.asignaciones = App._dbData.asignaciones.filter(
-          a => !(a.op_id === opId && a.persona === person)
+          a => !(a.op_id === opId && a.persona === person && a.etapa === stage)
         );
         App.renderPanel();
-        DB.removeAsignacion(opId, person).catch(e => console.warn('[Asignacion] remove:', e.message));
+        DB.removeAsignacion(opId, person, stage || null).catch(e => console.warn('[Asignacion] remove:', e.message));
         rerender();
       });
     });
 
-    // ── ✓ Cerrar etapa (supervisor sets ClickUp fin date) ───────
+    // ── ✓ Cerrar etapa ────────────────────────────────────────
     document.querySelectorAll('.btn-cerrar-etapa').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId   = btn.dataset.op;
@@ -381,7 +417,7 @@ const Asignacion = {
       });
     });
 
-    // ── ▶ Inicio (OP-level, first person wins) ───────────────
+    // ── ▶ Inicio ──────────────────────────────────────────────
     document.querySelectorAll('.btn-stage-inicio').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId  = btn.dataset.op;

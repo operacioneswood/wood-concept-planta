@@ -13,7 +13,7 @@ const App = {
     const map = {};
     for (const row of (dbData?.asignaciones || [])) {
       if (!map[row.op_id]) map[row.op_id] = [];
-      map[row.op_id].push({ person: row.persona, stage: row.etapa, estimatedDate: row.fecha_asignacion, comentario: row.comentario || '' });
+      map[row.op_id].push({ person: row.persona, stage: row.etapa, estimatedDate: row.fecha_asignacion, comentario: row.comentario || '', subprocesos: row.subprocesos || '' });
     }
     return map;
   },

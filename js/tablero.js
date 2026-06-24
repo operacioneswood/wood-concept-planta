@@ -3,7 +3,6 @@
 // ─────────────────────────────────────────────────────────────
 
 const Tablero = {
-  _dragging: null,
 
   render({ ops, dbData }) {
     this._renderPriority(ops, dbData);
@@ -12,9 +11,8 @@ const Tablero = {
 
   // ── Left column: priority order (by project) ─────────────
   _renderPriority(ops, dbData) {
-    const priority = App.buildPriorities(dbData); // array of project names
+    const priority = App.buildPriorities(dbData);
 
-    // Group OPs by project
     const projectMap = new Map();
     for (const op of ops) {
       const proj = op.project || '(Sin proyecto)';
@@ -22,7 +20,6 @@ const Tablero = {
       projectMap.get(proj).push(op);
     }
 
-    // Merge saved order with live projects (new ones appended)
     const allProjects = [...projectMap.keys()];
     const orderedProjects = [
       ...priority.filter(name => projectMap.has(name)),
@@ -41,9 +38,14 @@ const Tablero = {
       const projOps = projectMap.get(proj) || [];
       const statuses = [...new Set(projOps.map(op => op.status))];
       const anyRepro = projOps.some(op => !!op.inicioReproceso && !op.finReproceso);
+      const isFirst  = idx === 0;
+      const isLast   = idx === orderedProjects.length - 1;
       return `
-        <div class="tablero-item" draggable="true" data-id="${esc(proj)}" data-name="${esc(proj)}">
-          <span class="drag-handle">⠿</span>
+        <div class="tablero-item" data-id="${esc(proj)}" data-name="${esc(proj)}">
+          <div class="tablero-move-col">
+            <button class="tablero-move-btn" data-dir="up" data-id="${esc(proj)}" ${isFirst ? 'disabled' : ''}>▲</button>
+            <button class="tablero-move-btn" data-dir="dn" data-id="${esc(proj)}" ${isLast  ? 'disabled' : ''}>▼</button>
+          </div>
           <span class="tablero-rank">${idx + 1}</span>
           <div class="tablero-item-info">
             <div class="tablero-item-name">${esc(proj)}</div>
@@ -57,57 +59,40 @@ const Tablero = {
       `;
     }).join('');
 
-    this._bindDragDrop(list);
+    this._bindMoveButtons(list);
   },
 
-  _bindDragDrop(list) {
-    const items = list.querySelectorAll('.tablero-item');
-    items.forEach(item => {
-      item.addEventListener('dragstart', e => {
-        this._dragging = item;
-        item.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      item.addEventListener('dragend', () => {
-        item.classList.remove('dragging');
-        this._dragging = null;
-        this._savePriorityFromDOM(list);
-      });
-      item.addEventListener('dragover', e => {
-        e.preventDefault();
-        if (!this._dragging || this._dragging === item) return;
-        const rect = item.getBoundingClientRect();
-        const mid  = rect.top + rect.height / 2;
-        if (e.clientY < mid) {
-          list.insertBefore(this._dragging, item);
+  _bindMoveButtons(list) {
+    list.querySelectorAll('.tablero-move-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dir    = btn.dataset.dir;
+        const projId = btn.dataset.id;
+        const items  = [...list.querySelectorAll('.tablero-item')];
+        const ids    = items.map(i => i.dataset.id);
+        const idx    = ids.indexOf(projId);
+
+        if (dir === 'up' && idx > 0) {
+          [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
+        } else if (dir === 'dn' && idx < ids.length - 1) {
+          [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
         } else {
-          list.insertBefore(this._dragging, item.nextSibling);
+          return;
         }
+
+        const rows = ids.map(id => ({
+          proyecto_id:     id,
+          proyecto_nombre: items.find(i => i.dataset.id === id)?.dataset.name || '',
+        }));
+        App._dbData.prioridades = rows.map((r, i) => ({ ...r, orden: i }));
+        DB.setPrioridades(rows).catch(e => console.error('[Tablero] priority save failed:', e.message));
+        Tablero._renderPriority(App._data?.ops || [], App._dbData);
       });
     });
-  },
-
-  _savePriorityFromDOM(list) {
-    const rows = [...list.querySelectorAll('.tablero-item')].map(el => ({
-      proyecto_id:     el.dataset.id,
-      proyecto_nombre: el.dataset.name || '',
-    }));
-    // Update ranks visually
-    list.querySelectorAll('.tablero-rank').forEach((span, i) => {
-      span.textContent = i + 1;
-    });
-    // Update local cache immediately
-    App._dbData.prioridades = rows.map((r, i) => ({ ...r, orden: i }));
-    // Persist to Supabase (fire-and-forget)
-    DB.setPrioridades(rows).catch(e => console.error('[Tablero] priority save failed:', e.message));
   },
 
   // ── Right column: active OPs assigned to contratistas ────
   _renderContratistas(ops, dbData) {
     const assignments  = App.buildAssignments(dbData);
-    const personasMap  = App.buildPersonasMap(dbData);
-
-    // All contractor names (from personas table)
     const contratistas = (dbData?.personas || [])
       .filter(p => p.tipo === 'contratista' && p.activo)
       .map(p => p.nombre)
@@ -122,11 +107,9 @@ const Tablero = {
       return;
     }
 
-    // Build op map for quick lookup
     const opMap = Object.fromEntries(ops.map(o => [o.id, o]));
 
     container.innerHTML = contratistas.map(name => {
-      // Find all OPs assigned to this contractor
       const myOpIds = Object.entries(assignments)
         .filter(([, arr]) => arr.some(a => a.person === name))
         .map(([opId]) => opId);

@@ -59,11 +59,18 @@ const DB = {
     ));
   },
 
-  async removeAsignacion(op_id, persona = null) {
+  async removeAsignacion(op_id, persona = null, etapa = null) {
     let q = this._sb.from('asignaciones').delete().eq('op_id', op_id);
     if (persona) q = q.eq('persona', persona);
+    if (etapa)   q = q.eq('etapa', etapa);
     const { error } = await q;
     if (error) throw error;
+  },
+
+  async updateSubprocesos(op_id, etapa, persona, subprocesos) {
+    return this._q(sb => sb.from('asignaciones')
+      .update({ subprocesos })
+      .eq('op_id', op_id).eq('etapa', etapa).eq('persona', persona));
   },
 
   // ════════════════════════════════════════════════════════

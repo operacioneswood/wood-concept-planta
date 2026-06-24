@@ -10,7 +10,6 @@ const Panel = {
     const assignments = App.buildAssignments(dbData);
     const personasMap = App.buildPersonasMap(dbData);
 
-    // Build per-person data
     const personData = ebanistas.map(name => {
       const role  = personasMap[name] || 'ebanista';
       const myOps = ops.filter(op => (assignments[op.id] || []).some(a => a.person === name));
@@ -54,7 +53,7 @@ const Panel = {
       ${ops.length === 0 ? '<div class="empty-state"><div class="empty-icon">🏭</div><p>Sin OPs activos en planta.</p><p class="muted">Verifica la conexión en ⚙ Configuración.</p></div>' : ''}
     `;
 
-    this._bindDrag();
+    this._bindMove();
     this._bindActions();
   },
 
@@ -77,7 +76,6 @@ const Panel = {
   _renderRow({ name, myOps }, assignments) {
     const noWork = myOps.length === 0;
 
-    // Sort by saved drag order
     const savedOrder = this._getOrder(name);
     const orderedOps = savedOrder.length
       ? [...myOps].sort((a, b) => {
@@ -88,8 +86,14 @@ const Panel = {
       : myOps;
 
     const taskList = orderedOps.map((op, idx) => {
-      // All assignments this person has for this OP (may be multiple stages)
       const personAssigns = (assignments[op.id] || []).filter(x => x.person === name);
+
+      // Earliest assignment date for this person+OP
+      const assignDate = personAssigns.reduce((earliest, a) => {
+        if (!a.estimatedDate) return earliest;
+        return (!earliest || a.estimatedDate < earliest) ? a.estimatedDate : earliest;
+      }, null);
+      const assignDateFmt = assignDate ? fmtDate(isoToDate(assignDate)) : null;
 
       const stageInfos = personAssigns.map(a => {
         const stageId    = a.stage && a.stage !== '_' && a.stage !== 'reproceso' ? a.stage : null;
@@ -101,12 +105,22 @@ const Panel = {
         const stageClosed  = finKey && op[finKey];
         const fieldId      = finKey ? (this._fieldIds[finKey] || '') : '';
         const showCerrar   = stageStarted && !stageClosed && fieldId;
-        return { stageId, stageLabel, stageColor, finKey, fieldId, showCerrar };
+
+        // Sub-process labels for this stage
+        const subsList   = (a.subprocesos || '').split(',').filter(Boolean);
+        const subsLabels = subsList.map(id => subproLabel(id));
+
+        return { stageId, stageLabel, stageColor, finKey, fieldId, showCerrar, subsLabels };
       });
 
       const pills = stageInfos
         .filter(s => s.stageLabel)
-        .map(s => `<span class="stage-pill-sm" style="color:${s.stageColor}">${esc(s.stageLabel)}</span>`)
+        .map(s => {
+          const subsHtml = s.subsLabels.length
+            ? `<span class="panel-subs-lbl">${s.subsLabels.map(esc).join(', ')}</span>`
+            : '';
+          return `<span class="stage-pill-sm" style="color:${s.stageColor}">${esc(s.stageLabel)}</span>${subsHtml}`;
+        })
         .join('');
 
       const finBtns = stageInfos
@@ -128,15 +142,21 @@ const Panel = {
             data-datekey="${esc(s.finKey)}">✓ Cerrar${stageInfos.length > 1 ? ' ' + esc(s.stageLabel) : ''}</button>
         `).join('');
 
+      const isFirst = idx === 0;
+      const isLast  = idx === orderedOps.length - 1;
+
       return `
-        <div class="panel-task-row ${idx === 0 ? 'panel-task-current' : ''}"
-             draggable="true"
-             data-drag-person="${esc(name)}"
-             data-drag-opid="${esc(op.id)}">
-          <span class="panel-drag-handle" title="Arrastrar para reordenar">⠿</span>
-          ${op.noOp ? `<span class="panel-op-num">${esc(op.noOp)}</span>` : ''}
+        <div class="panel-task-row ${isFirst ? 'panel-task-current' : ''}"
+             data-person="${esc(name)}"
+             data-opid="${esc(op.id)}">
+          <div class="panel-move-btns">
+            <button class="panel-move-btn" data-dir="up" data-person="${esc(name)}" data-opid="${esc(op.id)}" ${isFirst ? 'disabled' : ''}>▲</button>
+            <button class="panel-move-btn" data-dir="dn" data-person="${esc(name)}" data-opid="${esc(op.id)}" ${isLast  ? 'disabled' : ''}>▼</button>
+          </div>
+          ${op.noOp    ? `<span class="panel-op-num">${esc(op.noOp)}</span>` : ''}
           ${op.project ? `<span class="panel-proj-lbl">${esc(op.project)}</span>` : ''}
           <span class="panel-task-name">${esc(op.name)}</span>
+          ${assignDateFmt ? `<span class="panel-assign-date">Asig. ${assignDateFmt}</span>` : ''}
           ${pills}
           <div class="panel-task-actions">
             ${finBtns}
@@ -160,7 +180,7 @@ const Panel = {
     `;
   },
 
-  // ── Drag order persistence ────────────────────────────────
+  // ── Order persistence ─────────────────────────────────────
   _getOrder(name) {
     try { return JSON.parse(localStorage.getItem('wp_panel_order_' + name)) || []; }
     catch { return []; }
@@ -170,55 +190,27 @@ const Panel = {
     localStorage.setItem('wp_panel_order_' + name, JSON.stringify(ids));
   },
 
-  // ── Drag-to-reorder ──────────────────────────────────────
-  _bindDrag() {
-    let dragged = null;
+  // ── ▲/▼ move buttons ─────────────────────────────────────
+  _bindMove() {
+    document.querySelectorAll('.panel-move-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dir    = btn.dataset.dir;
+        const person = btn.dataset.person;
+        const opid   = btn.dataset.opid;
 
-    document.querySelectorAll('.panel-task-row[draggable]').forEach(row => {
-      row.addEventListener('dragstart', e => {
-        dragged = row;
-        row.classList.add('panel-dragging');
-        e.dataTransfer.effectAllowed = 'move';
-      });
-
-      row.addEventListener('dragend', () => {
-        if (dragged) dragged.classList.remove('panel-dragging');
-        document.querySelectorAll('.panel-task-row.panel-drag-over')
-          .forEach(r => r.classList.remove('panel-drag-over'));
-        dragged = null;
-      });
-
-      row.addEventListener('dragover', e => {
-        e.preventDefault();
-        if (!dragged || row === dragged) return;
-        if (row.dataset.dragPerson !== dragged.dataset.dragPerson) return;
-        document.querySelectorAll('.panel-task-row.panel-drag-over')
-          .forEach(r => r.classList.remove('panel-drag-over'));
-        row.classList.add('panel-drag-over');
-      });
-
-      row.addEventListener('dragleave', () => row.classList.remove('panel-drag-over'));
-
-      row.addEventListener('drop', e => {
-        e.preventDefault();
-        row.classList.remove('panel-drag-over');
-        if (!dragged || row === dragged) return;
-        if (row.dataset.dragPerson !== dragged.dataset.dragPerson) return;
-
-        const person  = row.dataset.dragPerson;
-        const fromId  = dragged.dataset.dragOpid;
-
-        const container = row.closest('.panel-tasks-col');
+        const container = btn.closest('.panel-tasks-col');
         if (!container) return;
-        const allRows = [...container.querySelectorAll('.panel-task-row[data-drag-opid]')];
-        const ids = allRows.map(r => r.dataset.dragOpid);
+        const allRows = [...container.querySelectorAll('.panel-task-row[data-opid]')];
+        const ids     = allRows.map(r => r.dataset.opid);
+        const idx     = ids.indexOf(opid);
 
-        const fromIdx = ids.indexOf(fromId);
-        const toIdx   = ids.indexOf(row.dataset.dragOpid);
-        if (fromIdx === -1 || toIdx === -1) return;
-
-        ids.splice(fromIdx, 1);
-        ids.splice(toIdx, 0, fromId);
+        if (dir === 'up' && idx > 0) {
+          [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
+        } else if (dir === 'dn' && idx < ids.length - 1) {
+          [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
+        } else {
+          return;
+        }
 
         this._setOrder(person, ids);
         App.renderPanel();
@@ -228,7 +220,7 @@ const Panel = {
 
   // ── Fin / Cerrar actions ─────────────────────────────────
   _bindActions() {
-    // ■ Fin — logs historial, removes assignment
+    // ■ Fin — logs historial, removes assignment for that specific stage
     document.querySelectorAll('.panel-btn-fin').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId   = btn.dataset.op;
@@ -256,9 +248,9 @@ const Panel = {
           DB.upsertHistorial(histEntry).catch(e => console.warn('[Panel] historial:', e.message));
 
           App._dbData.asignaciones = App._dbData.asignaciones.filter(
-            a => !(a.op_id === opId && a.persona === person)
+            a => !(a.op_id === opId && a.persona === person && a.etapa === stage)
           );
-          DB.removeAsignacion(opId, person).catch(e => console.warn('[Panel] remove:', e.message));
+          DB.removeAsignacion(opId, person, stage).catch(e => console.warn('[Panel] remove:', e.message));
 
           App.renderPanel();
           Proyectos.render({ ...App._data, dbData: App._dbData });

@@ -117,3 +117,23 @@ function firstActivityDate(op) {
   }
   return null;
 }
+
+// Sub-processes per stage (optional granularity)
+const STAGE_SUBPROCESOS = {
+  enchapillado: [
+    { id: 'sabanas',  label: 'Sábanas'  },
+    { id: 'canteo',   label: 'Canteo'   },
+    { id: 'enchapar', label: 'Enchapar' },
+  ],
+  corte: [
+    { id: 'ensamble', label: 'Ensamble' },
+  ],
+};
+
+function subproLabel(id) {
+  for (const subs of Object.values(STAGE_SUBPROCESOS)) {
+    const found = subs.find(s => s.id === id);
+    if (found) return found.label;
+  }
+  return id;
+}
