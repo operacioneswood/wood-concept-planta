@@ -10,12 +10,10 @@ const Tiempos = {
     const overlay = el('tiempos-overlay');
     if (!overlay) return;
 
-    // Show loading state
     el('tiempos-op-label').textContent = `${op.noOp ? op.noOp + ' — ' : ''}${op.name}`;
     el('tiempos-tbody').innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--muted)">Cargando...</td></tr>';
     overlay.style.display = 'flex';
 
-    // Load existing records
     let map = {};
     try {
       const existing = await DB.getTiempos(op.id);
@@ -31,12 +29,17 @@ const Tiempos = {
     const tbody = el('tiempos-tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = STAGES.map(s => {
-      const t = map[s.id] || {};
+    // Build rows: one main row per TIEMPO_STAGE + collapsed sub-rows
+    const rows = TIEMPO_STAGES.flatMap(s => {
+      const t   = map[s.id] || {};
       const dur = this._calcDuration(t.fecha_inicio, t.hora_inicio, t.fecha_fin, t.hora_fin);
-      return `
-        <tr data-etapa="${esc(s.id)}">
-          <td class="t-etapa-lbl" style="color:${s.color}">${esc(s.label)}</td>
+
+      const mainRow = `
+        <tr data-etapa="${esc(s.id)}" class="t-main-row">
+          <td class="t-etapa-lbl" style="color:${s.color}">
+            <span>${esc(s.label)}</span>
+            ${s.subs?.length ? `<button class="t-expand-btn" data-stage="${esc(s.id)}" title="Ver subprocesos">⊕</button>` : ''}
+          </td>
           <td><input type="date" class="t-inp t-fi" value="${t.fecha_inicio || ''}"></td>
           <td><input type="time" class="t-inp t-hi" value="${t.hora_inicio || ''}"></td>
           <td><input type="date" class="t-inp t-ff" value="${t.fecha_fin   || ''}"></td>
@@ -44,7 +47,26 @@ const Tiempos = {
           <td class="t-dur" id="tdur-${esc(s.id)}">${dur}</td>
         </tr>
       `;
-    }).join('');
+
+      const subRows = (s.subs || []).map(sub => {
+        const st   = map[sub.id] || {};
+        const sdur = this._calcDuration(st.fecha_inicio, st.hora_inicio, st.fecha_fin, st.hora_fin);
+        return `
+          <tr data-etapa="${esc(sub.id)}" class="t-sub-row t-sub-of-${esc(s.id)}" style="display:none">
+            <td class="t-etapa-lbl t-sub-lbl" style="color:${s.color}">↳ ${esc(sub.label)}</td>
+            <td><input type="date" class="t-inp t-fi" value="${st.fecha_inicio || ''}"></td>
+            <td><input type="time" class="t-inp t-hi" value="${st.hora_inicio || ''}"></td>
+            <td><input type="date" class="t-inp t-ff" value="${st.fecha_fin   || ''}"></td>
+            <td><input type="time" class="t-inp t-hf" value="${st.hora_fin    || ''}"></td>
+            <td class="t-dur" id="tdur-${esc(sub.id)}">${sdur}</td>
+          </tr>
+        `;
+      });
+
+      return [mainRow, ...subRows];
+    });
+
+    tbody.innerHTML = rows.join('');
 
     // Live duration update on any field change
     tbody.querySelectorAll('tr[data-etapa]').forEach(row => {
@@ -52,6 +74,27 @@ const Tiempos = {
         inp.addEventListener('change', () => this._refreshDuration(row));
       });
     });
+
+    // Expand/collapse sub-process rows
+    tbody.querySelectorAll('.t-expand-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stage   = btn.dataset.stage;
+        const subRows = tbody.querySelectorAll(`.t-sub-of-${stage}`);
+        const isOpen  = btn.textContent === '⊖';
+        subRows.forEach(r => r.style.display = isOpen ? 'none' : '');
+        btn.textContent = isOpen ? '⊕' : '⊖';
+      });
+    });
+
+    // Auto-expand stages that already have sub-data saved
+    for (const s of TIEMPO_STAGES) {
+      if (!s.subs?.length) continue;
+      const hasSubData = s.subs.some(sub => map[sub.id]);
+      if (hasSubData) {
+        const btn = tbody.querySelector(`.t-expand-btn[data-stage="${s.id}"]`);
+        if (btn) btn.click();
+      }
+    }
   },
 
   _refreshDuration(row) {
@@ -91,7 +134,7 @@ const Tiempos = {
         const hi = row.querySelector('.t-hi').value;
         const ff = row.querySelector('.t-ff').value;
         const hf = row.querySelector('.t-hf').value;
-        if (!fi && !hi && !ff && !hf) continue; // skip fully empty rows
+        if (!fi && !hi && !ff && !hf) continue;
         await DB.upsertTiempo({
           op_id:        op.id,
           nombre_op:    op.name,
@@ -103,6 +146,9 @@ const Tiempos = {
         });
       }
       btn.textContent = '✓ Guardado';
+      // Refresh dbData so proyectos shows updated tiempos
+      App._dbData.tiempos = await DB.getAllTiempos().catch(() => App._dbData.tiempos);
+      Proyectos.render({ ...App._data, dbData: App._dbData });
       setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
     } catch (e) {
       alert('Error al guardar: ' + e.message);

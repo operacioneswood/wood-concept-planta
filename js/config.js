@@ -4,20 +4,19 @@
 
 // ── Production stages in order ────────────────────────────────
 const STAGES = [
-  { id: 'corte',         label: 'Corte',         color: '#3B6D11' },
-  { id: 'chapilla',      label: 'Chapilla',       color: '#185FA5' },
-  { id: 'enchapillado',  label: 'Enchapillado',   color: '#533AB7' },
-  { id: 'armado',        label: 'Armado',         color: '#8B3A1C' },
-  { id: 'pintura',       label: 'Pintura',        color: '#9B5C0A' },
+  { id: 'corte',        label: 'Corte',        color: '#3B6D11' },
+  { id: 'enchape',      label: 'Enchape',      color: '#533AB7' },
+  { id: 'ebanisteria',  label: 'Ebanistería',  color: '#8B3A1C' },
+  { id: 'pintura',      label: 'Pintura',      color: '#9B5C0A' },
 ];
 
 const STAGE_IDS    = STAGES.map(s => s.id);
 const STAGE_LABELS = Object.fromEntries(STAGES.map(s => [s.id, s.label]));
 const STAGE_COLORS = Object.fromEntries(STAGES.map(s => [s.id, s.color]));
 
-// Field key names derived from stage ids
-const STAGE_INICIO = { corte: 'inicioCorte', chapilla: 'inicioChapilla', enchapillado: 'inicioEnchapillado', armado: 'inicioArmado', pintura: 'inicioPintura' };
-const STAGE_FIN    = { corte: 'finCorte',    chapilla: 'finChapilla',    enchapillado: 'finEnchapillado',    armado: 'finArmado',    pintura: 'finPintura'    };
+// Field key names → ClickUp custom field keys (unchanged on ClickUp side)
+const STAGE_INICIO = { corte: 'inicioCorte', enchape: 'inicioEnchapillado', ebanisteria: 'inicioArmado', pintura: 'inicioPintura' };
+const STAGE_FIN    = { corte: 'finCorte',    enchape: 'finEnchapillado',    ebanisteria: 'finArmado',    pintura: 'finPintura'    };
 
 // ── ClickUp statuses that count as "in plant" ─────────────────
 const ACTIVE_STATUSES = new Set(['fabrica', 'en ebanisteria', 'en pintura', 'pendiente de revision']);
@@ -118,9 +117,9 @@ function firstActivityDate(op) {
   return null;
 }
 
-// Sub-processes per stage (optional granularity)
+// Sub-processes per stage shown in assignment UI
 const STAGE_SUBPROCESOS = {
-  enchapillado: [
+  enchape: [
     { id: 'sabanas',  label: 'Sábanas'  },
     { id: 'canteo',   label: 'Canteo'   },
     { id: 'enchapar', label: 'Enchapar' },
@@ -129,6 +128,26 @@ const STAGE_SUBPROCESOS = {
     { id: 'ensamble', label: 'Ensamble' },
   ],
 };
+
+// Tiempos modal stages — 3 main rows with optional sub-process time rows
+const TIEMPO_STAGES = [
+  {
+    id: 'corte', label: 'Corte', color: '#3B6D11',
+    subs: [{ id: 'ensamble', label: 'Ensamble' }],
+  },
+  {
+    id: 'enchape', label: 'Enchape', color: '#533AB7',
+    subs: [
+      { id: 'sabanas',  label: 'Sábanas'  },
+      { id: 'canteo',   label: 'Canteo'   },
+      { id: 'enchapar', label: 'Enchapar' },
+    ],
+  },
+  {
+    id: 'ebanisteria', label: 'Ebanistería', color: '#8B3A1C',
+    subs: [],
+  },
+];
 
 function subproLabel(id) {
   for (const subs of Object.values(STAGE_SUBPROCESOS)) {

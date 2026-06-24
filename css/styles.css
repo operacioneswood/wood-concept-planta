@@ -1160,7 +1160,17 @@ body {
 }
 .tiempos-table td { padding: 5px 6px; border-bottom: 1px solid var(--divider); }
 .tiempos-table tr:last-child td { border-bottom: none; }
-.t-etapa-lbl { font-weight: 600; white-space: nowrap; min-width: 90px; }
+.t-etapa-lbl { font-weight: 600; white-space: nowrap; min-width: 90px; display: flex; align-items: center; gap: 6px; }
+.t-expand-btn {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  padding: 1px 5px; font-size: 11px; cursor: pointer; color: var(--muted);
+  line-height: 1.4; transition: background .12s; flex-shrink: 0;
+  touch-action: manipulation;
+}
+.t-expand-btn:hover { background: var(--divider); color: var(--text); }
+.t-sub-row td { background: var(--surface); }
+.t-sub-lbl { padding-left: 6px; font-weight: 500; font-size: 12px; opacity: 0.85; }
+.prom-item-sub { opacity: 0.88; transform: scale(0.94); transform-origin: left center; }
 .t-inp {
   width: 100%; border: 1px solid var(--border);
   border-radius: 5px; padding: 4px 6px;

@@ -198,18 +198,31 @@ const Proyectos = {
   },
 
   _renderAverages(avgMap) {
-    const items = STAGES
-      .filter(s => avgMap[s.id])
-      .map(s => {
-        const { avg, count } = avgMap[s.id];
-        return `
+    const items = [];
+    for (const ts of TIEMPO_STAGES) {
+      if (avgMap[ts.id]) {
+        const { avg, count } = avgMap[ts.id];
+        items.push(`
           <div class="prom-item">
-            <span class="prom-etapa" style="color:${s.color}">${esc(s.label)}</span>
+            <span class="prom-etapa" style="color:${ts.color}">${esc(ts.label)}</span>
             <span class="prom-val">${this._fmtMins(avg)}</span>
             <span class="prom-count">${count} OP${count !== 1 ? 's' : ''}</span>
           </div>
-        `;
-      });
+        `);
+      }
+      for (const sub of (ts.subs || [])) {
+        if (avgMap[sub.id]) {
+          const { avg, count } = avgMap[sub.id];
+          items.push(`
+            <div class="prom-item prom-item-sub">
+              <span class="prom-etapa" style="color:${ts.color}">↳ ${esc(sub.label)}</span>
+              <span class="prom-val">${this._fmtMins(avg)}</span>
+              <span class="prom-count">${count} OP${count !== 1 ? 's' : ''}</span>
+            </div>
+          `);
+        }
+      }
+    }
     if (!items.length) return '';
     return `
       <div class="promedios-strip">
