@@ -841,6 +841,7 @@ body {
 .rend-log-right  { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .rend-log-repro  { color: var(--amber); font-weight: 500; }
 .rend-log-stage  { font-size: 10px; color: var(--muted); background: var(--divider); border-radius: 3px; padding: 1px 4px; margin-left: 4px; }
+.rend-log-sub    { font-size: 10px; color: var(--blue); background: var(--blue-bg); border-radius: 3px; padding: 1px 4px; margin-left: 3px; }
 .rend-log-more   { font-size: 12px; margin-top: 4px; }
 .rend-empty      { font-size: 12px; }
 .btn-rend-expand {

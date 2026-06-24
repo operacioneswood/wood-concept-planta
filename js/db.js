@@ -80,11 +80,10 @@ const DB = {
     return this._q(sb => sb.from('historial').select('*').order('fecha_fin', { ascending: false }));
   },
 
-  async upsertHistorial({ op_id, etapa, persona, fecha_inicio, fecha_fin, es_reproceso, comentario }) {
-    return this._q(sb => sb.from('historial').upsert(
-      { op_id, etapa, persona, fecha_inicio, fecha_fin, es_reproceso: !!es_reproceso, comentario: comentario ?? null },
-      { onConflict: 'op_id,etapa,persona' }
-    ));
+  async upsertHistorial({ op_id, etapa, persona, fecha_inicio, fecha_fin, es_reproceso, comentario, subprocesos = null }) {
+    const row = { op_id, etapa, persona, fecha_inicio, fecha_fin, es_reproceso: !!es_reproceso, comentario: comentario ?? null };
+    if (subprocesos) row.subprocesos = subprocesos;
+    return this._q(sb => sb.from('historial').upsert(row, { onConflict: 'op_id,etapa,persona' }));
   },
 
   async deleteHistorial(op_id, etapa, persona) {

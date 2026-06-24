@@ -145,12 +145,15 @@ const Rendimiento = {
             ${myRows.slice(0, 4).map(r => {
               const opData  = ops.find(o => o.id === r.op_id);
               const opLabel = opData?.noOp || opData?.name || r.op_id;
+              const subTags = (r.subprocesos || '').split(',').filter(Boolean)
+                .map(id => `<span class="rend-log-sub">${esc(subproLabel(id))}</span>`).join('');
               return `
               <div class="rend-log-entry">
                 <div class="rend-log-item">
                   <span class="${r.es_reproceso ? 'rend-log-repro' : ''}">
                     ${esc(opLabel)}
                     <span class="rend-log-stage">${esc(STAGE_LABELS[r.etapa] || r.etapa)}</span>
+                    ${subTags}
                   </span>
                   <div class="rend-log-right">
                     <span class="muted-txt">${esc(r.fecha_fin || '')}</span>
@@ -236,7 +239,10 @@ const Rendimiento = {
         <tr class="rh-row ${r.es_reproceso ? 'rh-row-repro' : ''}"
             data-op="${esc(r.op_id)}" data-etapa="${esc(r.etapa)}" data-persona="${esc(r.persona)}">
           <td class="rh-op-cell" title="${esc(opTitle)}">${esc(opLabel)}</td>
-          <td class="rh-etapa-cell">${esc(STAGE_LABELS[r.etapa] || r.etapa)}</td>
+          <td class="rh-etapa-cell">
+            ${esc(STAGE_LABELS[r.etapa] || r.etapa)}
+            ${(r.subprocesos || '').split(',').filter(Boolean).map(id => `<span class="rend-log-sub">${esc(subproLabel(id))}</span>`).join('')}
+          </td>
           <td><input type="date" class="rh-input rh-inicio" value="${esc(r.fecha_inicio || '')}"></td>
           <td><input type="date" class="rh-input rh-fin"    value="${esc(r.fecha_fin    || '')}"></td>
           <td><input type="text" class="rh-input rh-comment" value="${esc(r.comentario  || '')}" placeholder="Sin comentario"></td>

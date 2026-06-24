@@ -236,10 +236,14 @@ const Panel = {
           const inicioKey  = STAGE_INICIO[stage];
           const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
 
+          // Grab sub-processes from assignment before it's removed
+          const assignRow   = App._dbData.asignaciones.find(a => a.op_id === opId && a.persona === person && a.etapa === stage);
+          const subprocesos = assignRow?.subprocesos || '';
+
           const histEntry = {
             op_id: opId, etapa: stage, persona: person,
             fecha_inicio: fechaInicio, fecha_fin: today,
-            es_reproceso: false, comentario: '',
+            es_reproceso: false, comentario: '', subprocesos,
           };
           App._dbData.historial = (App._dbData.historial || []).filter(
             h => !(h.op_id === opId && h.etapa === stage && h.persona === person)
