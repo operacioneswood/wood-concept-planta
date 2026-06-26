@@ -42,9 +42,10 @@ const CONTRATISTAS_CONOCIDOS = new Set([
 
 // ── Personas excluidas de la web app (siguen en ClickUp) ─────
 const EXCLUDED_PERSONAS = new Set([
-  'Luis Polo','Manuel/Camaño','Ivan Rios','Alvaro','Andersson','Carlos','Edward',
-  'Jose Escobar Jr.','Nolberto','Equipo de corte y canteo',
+  'luis polo','manuel/camano','ivan rios','alvaro','andersson','carlos','edward',
+  'jose escobar jr.','nolberto','equipo de corte y canteo',
 ]);
+const isExcluded = name => EXCLUDED_PERSONAS.has(normStr(name));
 
 // ── Default ClickUp connection ────────────────────────────────
 // Key stored in localStorage takes priority over this default.
