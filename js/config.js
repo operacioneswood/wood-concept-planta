@@ -43,6 +43,7 @@ const CONTRATISTAS_CONOCIDOS = new Set([
 // ── Personas excluidas de la web app (siguen en ClickUp) ─────
 const EXCLUDED_PERSONAS = new Set([
   'Luis Polo','Manuel/Camaño','Ivan Rios','Alvaro','Andersson','Carlos','Edward',
+  'Jose Escobar Jr.','Nolberto','Equipo de corte y canteo',
 ]);
 
 // ── Default ClickUp connection ────────────────────────────────
