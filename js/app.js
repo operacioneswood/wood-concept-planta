@@ -13,7 +13,8 @@ const App = {
     const map = {};
     for (const row of (dbData?.asignaciones || [])) {
       if (!map[row.op_id]) map[row.op_id] = [];
-      map[row.op_id].push({ person: row.persona, stage: row.etapa, estimatedDate: row.fecha_asignacion, comentario: row.comentario || '', subprocesos: row.subprocesos || '' });
+      const stage = STAGE_ALIASES[row.etapa] || row.etapa;
+      map[row.op_id].push({ person: row.persona, stage, estimatedDate: row.fecha_asignacion, comentario: row.comentario || '', subprocesos: row.subprocesos || '' });
     }
     return map;
   },

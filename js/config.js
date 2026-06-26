@@ -14,12 +14,12 @@ const STAGE_IDS    = STAGES.map(s => s.id);
 const STAGE_LABELS = Object.fromEntries(STAGES.map(s => [s.id, s.label]));
 const STAGE_COLORS = Object.fromEntries(STAGES.map(s => [s.id, s.color]));
 
-// Field key names → ClickUp custom field keys (unchanged on ClickUp side)
-const STAGE_INICIO = { corte: 'inicioCorte', enchape: 'inicioEnchapillado', ebanisteria: 'inicioArmado', pintura: 'inicioPintura' };
-const STAGE_FIN    = { corte: 'finCorte',    enchape: 'finEnchapillado',    ebanisteria: 'finArmado',    pintura: 'finPintura'    };
+// Field key names → ClickUp custom field property names (must match ClickUp field labels after camelCase normalization)
+const STAGE_INICIO = { corte: 'inicioCorte', enchape: 'inicioEnchape', ebanisteria: 'inicioArmado', pintura: 'inicioPintura' };
+const STAGE_FIN    = { corte: 'finCorte',    enchape: 'finEnchape',    ebanisteria: 'finArmado',    pintura: 'finPintura'    };
 
 // ── ClickUp statuses that count as "in plant" ─────────────────
-const ACTIVE_STATUSES = new Set(['fabrica', 'en ebanisteria', 'en pintura', 'pendiente de revision']);
+const ACTIVE_STATUSES = new Set(['fabrica', 'corte', 'enchape', 'ebanisteria', 'en ebanisteria', 'en pintura', 'pendiente de revision']);
 
 const STATUS_DISPLAY = {
   'fabrica':               { label: 'Fábrica',              cls: 'sb-green'  },
@@ -116,6 +116,9 @@ function firstActivityDate(op) {
   }
   return null;
 }
+
+// Old stage IDs → new stage IDs (for data saved before renames)
+const STAGE_ALIASES = { armado: 'ebanisteria', enchapillado: 'enchape' };
 
 // Sub-processes per stage shown in assignment UI
 const STAGE_SUBPROCESOS = {

@@ -35,7 +35,7 @@ const PlantaAPI = {
   _rehydrateOp(op) {
     const dateKeys = [
       'inicioCorte','finCorte','inicioChapilla','finChapilla',
-      'inicioEnchapillado','finEnchapillado','inicioArmado','finArmado',
+      'inicioEnchape','finEnchape','inicioArmado','finArmado',
       'inicioPintura','finPintura','inicioReproceso','finReproceso',
     ];
     const out = { ...op };
@@ -157,8 +157,8 @@ const PlantaAPI = {
         finCorte:           find('fin corte'),
         inicioChapilla:     find('inicio chapilla'),
         finChapilla:        find('fin chapilla'),
-        inicioEnchapillado: find('inicio enchapillado'),
-        finEnchapillado:    find('fin enchapillado'),
+        inicioEnchape:      find('inicio enchape', 'inicio enchapillado'),
+        finEnchape:         find('fin enchape', 'fin enchapillado'),
         inicioArmado:       find('inicio armado'),
         finArmado:          find('fin armado'),
         inicioPintura:      find('inicio pintura'),
@@ -221,8 +221,8 @@ const PlantaAPI = {
       finCorte:            getDate(fieldIds.finCorte),
       inicioChapilla:      getDate(fieldIds.inicioChapilla),
       finChapilla:         getDate(fieldIds.finChapilla),
-      inicioEnchapillado:  getDate(fieldIds.inicioEnchapillado),
-      finEnchapillado:     getDate(fieldIds.finEnchapillado),
+      inicioEnchape:       getDate(fieldIds.inicioEnchape),
+      finEnchape:          getDate(fieldIds.finEnchape),
       inicioArmado:        getDate(fieldIds.inicioArmado),
       finArmado:           getDate(fieldIds.finArmado),
       inicioPintura:       getDate(fieldIds.inicioPintura),
