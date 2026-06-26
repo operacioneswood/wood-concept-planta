@@ -40,6 +40,11 @@ const CONTRATISTAS_CONOCIDOS = new Set([
   'jose','simon','david','alex','valentin','lizardo','dimas',
 ]);
 
+// ── Personas excluidas de la web app (siguen en ClickUp) ─────
+const EXCLUDED_PERSONAS = new Set([
+  'Luis Polo','Manuel/Camaño','Ivan Rios','Alvaro','Andersson','Carlos','Edward',
+]);
+
 // ── Default ClickUp connection ────────────────────────────────
 // Key stored in localStorage takes priority over this default.
 // Note: this file is in GitHub — keep repo private if this key is sensitive.

@@ -151,7 +151,7 @@ const App = {
       ...(this._data.ebanistas || []),
       ...(this._data.pintores  || []),
       ...supabasePeople,
-    ])];
+    ])].filter(n => !EXCLUDED_PERSONAS.has(n));
     const payload = { ...this._data, ebanistas: allPeople, dbData: this._dbData };
     Panel.render(payload);
     Tablero.render(payload);
@@ -168,7 +168,7 @@ const App = {
   renderAsignacion() {
     if (!this._data) return;
     const supabasePeople = (this._dbData.personas || []).filter(p => p.activo).map(p => p.nombre);
-    const allPeople = [...new Set([...(this._data.ebanistas || []), ...(this._data.pintores || []), ...supabasePeople])];
+    const allPeople = [...new Set([...(this._data.ebanistas || []), ...(this._data.pintores || []), ...supabasePeople])].filter(n => !EXCLUDED_PERSONAS.has(n));
     Asignacion.render({ ...this._data, ebanistas: allPeople, dbData: this._dbData });
   },
 
