@@ -112,10 +112,14 @@ const Tiempos = {
     const end   = new Date(`${ff}T${hf || '00:00'}`);
     const mins  = Math.round((end - start) / 60000);
     if (isNaN(mins) || mins < 0) return '—';
-    const h = Math.floor(mins / 60);
+    const d = Math.floor(mins / 1440);
+    const h = Math.floor((mins % 1440) / 60);
     const m = mins % 60;
-    if (h === 0) return `${m}min`;
-    return m === 0 ? `${h}h` : `${h}h ${m}min`;
+    const parts = [];
+    if (d) parts.push(`${d}d`);
+    if (h) parts.push(`${h}h`);
+    if (m) parts.push(`${m}min`);
+    return parts.length ? parts.join(' ') : '0min';
   },
 
   async save() {
@@ -126,8 +130,16 @@ const Tiempos = {
     const orig = btn.textContent;
     btn.textContent = 'Guardando...'; btn.disabled = true;
 
+    const toMs = (fecha, hora) => {
+      if (!fecha) return null;
+      const dt = new Date(`${fecha}T${hora || '00:00'}:00`);
+      return isNaN(dt.getTime()) ? null : dt.getTime();
+    };
+
     try {
       const rows = document.querySelectorAll('#tiempos-tbody tr[data-etapa]');
+
+      // 1. Save all rows to Supabase
       for (const row of rows) {
         const etapa = row.dataset.etapa;
         const fi = row.querySelector('.t-fi').value;
@@ -145,8 +157,43 @@ const Tiempos = {
           hora_fin:     hf || null,
         });
       }
+
+      // 2. Auto-fill ClickUp dates for main stages where they're not set yet
+      const fieldIds = App._data?.fieldIds || {};
+      let clickupUpdated = false;
+      for (const row of rows) {
+        const etapa = row.dataset.etapa;
+        if (!STAGE_INICIO[etapa]) continue; // skip sub-stages (ensamble, sabanas, etc.)
+        const fi = row.querySelector('.t-fi').value;
+        const hi = row.querySelector('.t-hi').value;
+        const ff = row.querySelector('.t-ff').value;
+        const hf = row.querySelector('.t-hf').value;
+
+        const inicioKey = STAGE_INICIO[etapa];
+        const finKey    = STAGE_FIN[etapa];
+
+        if (fi && fieldIds[inicioKey] && !op[inicioKey]) {
+          const ms = toMs(fi, hi);
+          if (ms) {
+            await PlantaAPI.setField(op.id, fieldIds[inicioKey], ms)
+              .catch(e => console.warn('[Tiempos] ClickUp inicio:', e.message));
+            op[inicioKey] = new Date(ms);
+            clickupUpdated = true;
+          }
+        }
+        if (ff && fieldIds[finKey] && !op[finKey]) {
+          const ms = toMs(ff, hf);
+          if (ms) {
+            await PlantaAPI.setField(op.id, fieldIds[finKey], ms)
+              .catch(e => console.warn('[Tiempos] ClickUp fin:', e.message));
+            op[finKey] = new Date(ms);
+            clickupUpdated = true;
+          }
+        }
+      }
+      if (clickupUpdated) PlantaAPI.clearCache();
+
       btn.textContent = '✓ Guardado';
-      // Refresh dbData so proyectos shows updated tiempos
       App._dbData.tiempos = await DB.getAllTiempos().catch(() => App._dbData.tiempos);
       Proyectos.render({ ...App._data, dbData: App._dbData });
       setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
