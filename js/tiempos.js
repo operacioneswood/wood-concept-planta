@@ -186,7 +186,8 @@ const Tiempos = {
 
       // 2. Sync to ClickUp for all main stages with data
       const fieldIds = App._data?.fieldIds || {};
-      console.log('[Tiempos] fieldIds disponibles:', JSON.stringify(fieldIds));
+      console.log('[Tiempos] op.id:', op.id);
+      console.log('[Tiempos] fieldIds:', JSON.stringify(fieldIds));
       const cuErrors  = [];
       let   cuSynced  = 0;
 
@@ -197,23 +198,28 @@ const Tiempos = {
         const hi = row.querySelector('.t-hi').value;
         const ff = row.querySelector('.t-ff').value;
         const hf = row.querySelector('.t-hf').value;
+        console.log(`[Tiempos] etapa=${etapa} fi="${fi}" hi="${hi}" ff="${ff}" hf="${hf}"`);
 
         const inicioKey  = STAGE_INICIO[etapa];
         const finKey     = STAGE_FIN[etapa];
         const inicioFId  = fieldIds[inicioKey];
         const finFId     = fieldIds[finKey];
+        console.log(`[Tiempos] ${inicioKey}=${inicioFId}  ${finKey}=${finFId}`);
 
         if (fi) {
           if (!inicioFId) {
             cuErrors.push(`Sin campo ClickUp para ${inicioKey}`);
           } else {
             const ms = toMs(fi, hi);
+            console.log(`[Tiempos] inicio ms=${ms} → ${ms ? new Date(ms).toISOString() : 'null'}`);
             if (ms) {
               try {
                 await PlantaAPI.setField(op.id, inicioFId, ms);
                 op[inicioKey] = new Date(ms);
                 cuSynced++;
+                console.log(`[Tiempos] inicio OK cuSynced=${cuSynced}`);
               } catch (e) {
+                console.error(`[Tiempos] inicio FAIL:`, e);
                 cuErrors.push(`Inicio ${STAGE_LABELS[etapa] || etapa}: ${e.message}`);
               }
             }
@@ -224,12 +230,15 @@ const Tiempos = {
             cuErrors.push(`Sin campo ClickUp para ${finKey}`);
           } else {
             const ms = toMs(ff, hf);
+            console.log(`[Tiempos] fin ms=${ms} → ${ms ? new Date(ms).toISOString() : 'null'}`);
             if (ms) {
               try {
                 await PlantaAPI.setField(op.id, finFId, ms);
                 op[finKey] = new Date(ms);
                 cuSynced++;
+                console.log(`[Tiempos] fin OK cuSynced=${cuSynced}`);
               } catch (e) {
+                console.error(`[Tiempos] fin FAIL:`, e);
                 cuErrors.push(`Fin ${STAGE_LABELS[etapa] || etapa}: ${e.message}`);
               }
             }
@@ -237,6 +246,7 @@ const Tiempos = {
         }
       }
 
+      console.log(`[Tiempos] sync done: cuSynced=${cuSynced} cuErrors=${JSON.stringify(cuErrors)}`);
       if (cuSynced > 0) PlantaAPI.clearCache();
       if (cuErrors.length) {
         console.error('[Tiempos] ClickUp errors:', cuErrors);

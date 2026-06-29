@@ -236,16 +236,22 @@ const PlantaAPI = {
   // ── Set a custom date field value on a task ──────────────
   async setField(taskId, fieldId, valueMs) {
     const apiKey = this.getApiKey();
+    console.log(`[CU] setField task=${taskId} field=${fieldId} value=${valueMs}`);
     const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/field/${fieldId}`, {
       method:  'POST',
       headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
       body:    JSON.stringify({ value: valueMs }),
     });
+    console.log(`[CU] setField HTTP ${res.status}`);
     if (!res.ok) {
       const msg = await res.text().catch(() => String(res.status));
+      console.error(`[CU] setField error body:`, msg);
       throw new Error(`ClickUp field ${res.status}: ${msg}`);
     }
-    return res.json();
+    // ClickUp may return empty body on success — handle gracefully
+    const text = await res.text();
+    try { return text ? JSON.parse(text) : {}; }
+    catch { return {}; }
   },
 
   // ── Mark OP complete in ClickUp ──────────────────────────
