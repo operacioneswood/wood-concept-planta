@@ -1187,4 +1187,24 @@ body {
 /* Tablet */
 .tablet .modal-tiempos { max-width: 95vw; }
 .tablet .t-inp { min-height: 40px; font-size: 14px !important; }
+
+/* ── Plano ── */
+.asign-plano-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px 6px; border-top: 1px solid var(--divider);
+  background: var(--surface);
+}
+.asign-plano-icon { font-size: 13px; }
+.asign-plano-lbl { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.asign-plano-sel {
+  font-size: 12px; font-family: inherit;
+  border: 1px solid var(--border); border-radius: 5px;
+  padding: 3px 6px; background: var(--card); color: var(--text);
+  cursor: pointer; flex: 1; max-width: 200px;
+}
+.panel-plano-lbl {
+  font-size: 11px; color: var(--muted);
+  background: var(--divider); border-radius: 4px;
+  padding: 1px 6px; white-space: nowrap;
+}
 .tablet .tiempos-table td { padding: 7px 6px; }

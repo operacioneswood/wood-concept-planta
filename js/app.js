@@ -26,6 +26,12 @@ const App = {
       .map(r => r.proyecto_id);
   },
 
+  buildPlanosMap(dbData) {
+    const map = {};
+    for (const p of (dbData?.planos || [])) map[p.op_id] = p.persona;
+    return map;
+  },
+
   buildPersonasMap(dbData) {
     const map = {};
     for (const p of (dbData?.personas || [])) {
@@ -67,13 +73,14 @@ const App = {
 
   async _loadDbData() {
     try {
-      const [asignaciones, prioridades, produccion, personas, historial, tiempos] = await Promise.all([
+      const [asignaciones, prioridades, produccion, personas, historial, tiempos, planos] = await Promise.all([
         DB.getAsignaciones(),
         DB.getPrioridades(),
         DB.getProduccion(),
         DB.getPersonas(),
         DB.getHistorial(),
         DB.getAllTiempos(),
+        DB.getPlanos(),
       ]);
       this._dbData = {
         asignaciones: asignaciones || [],
@@ -82,6 +89,7 @@ const App = {
         personas:     personas     || [],
         historial:    historial    || [],
         tiempos:      tiempos      || [],
+        planos:       planos       || [],
       };
     } catch (e) {
       console.error('[App] DB load failed:', e.message);

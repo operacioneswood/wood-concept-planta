@@ -3,10 +3,12 @@
 // ─────────────────────────────────────────────────────────────
 
 const Panel = {
-  _fieldIds: {},
+  _fieldIds:  {},
+  _planosMap: {},
 
   render({ ops, ebanistas, dbData, fieldIds }) {
-    this._fieldIds = fieldIds || {};
+    this._fieldIds  = fieldIds || {};
+    this._planosMap = App.buildPlanosMap(dbData);
     const assignments = App.buildAssignments(dbData);
     const personasMap = App.buildPersonasMap(dbData);
 
@@ -157,6 +159,7 @@ const Panel = {
           ${op.project ? `<span class="panel-proj-lbl">${esc(op.project)}</span>` : ''}
           <span class="panel-task-name">${esc(op.name)}</span>
           ${assignDateFmt ? `<span class="panel-assign-date">Asig. ${assignDateFmt}</span>` : ''}
+          ${this._planosMap[op.id] ? `<span class="panel-plano-lbl">📐 ${esc(this._planosMap[op.id])}</span>` : ''}
           ${pills}
           <div class="panel-task-actions">
             ${finBtns}

@@ -146,6 +146,25 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
+  // PLANOS  (who currently holds the physical plan for an OP)
+  // ════════════════════════════════════════════════════════
+  async getPlanos() {
+    return this._q(sb => sb.from('planos').select('*'));
+  },
+
+  async setPlano(op_id, persona) {
+    return this._q(sb => sb.from('planos').upsert(
+      { op_id, persona, updated_at: new Date().toISOString() },
+      { onConflict: 'op_id' }
+    ));
+  },
+
+  async removePlano(op_id) {
+    const { error } = await this._sb.from('planos').delete().eq('op_id', op_id);
+    if (error) throw error;
+  },
+
+  // ════════════════════════════════════════════════════════
   // SETUP — create tables if they don't exist (run once)
   // ════════════════════════════════════════════════════════
   async setupTables() {

@@ -6,11 +6,13 @@ const Asignacion = {
   _collapsed:    new Set(),
   _ebanistas:    [],
   _fieldIds:     {},
+  _planosMap:    {},
   _filterActive: false,
 
   render({ ops, ebanistas, dbData, fieldIds }) {
     this._ebanistas = ebanistas;
     this._fieldIds  = fieldIds || {};
+    this._planosMap = App.buildPlanosMap(dbData);
 
     const body = el('asignacion-body');
     if (!ops.length) {
@@ -157,6 +159,14 @@ const Asignacion = {
           </div>
         </div>
         ${opAssigns.length > 0 ? `<div class="asign-chips">${chips}</div>` : ''}
+        <div class="asign-plano-row">
+          <span class="asign-plano-icon">📐</span>
+          <span class="asign-plano-lbl">Plano:</span>
+          <select class="asign-plano-sel" data-op="${esc(op.id)}">
+            <option value="">— Nadie —</option>
+            ${ebanistas.map(n => `<option value="${esc(n)}" ${this._planosMap[op.id] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}
+          </select>
+        </div>
         <div class="asign-card-add">
           <select class="asign-select asign-person" data-op="${esc(op.id)}">
             <option value="">— Agregar persona —</option>
@@ -224,6 +234,25 @@ const Asignacion = {
           body.classList.add('proj-group-collapsed');
           if (arrow) arrow.textContent = '▶';
         }
+      });
+    });
+
+    // ── Plano holder ─────────────────────────────────────────
+    document.querySelectorAll('.asign-plano-sel').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const opId   = sel.dataset.op;
+        const persona = sel.value;
+        if (persona) {
+          App._dbData.planos = App._dbData.planos.filter(p => p.op_id !== opId);
+          App._dbData.planos.push({ op_id: opId, persona });
+          this._planosMap[opId] = persona;
+          DB.setPlano(opId, persona).catch(e => console.warn('[Asignacion] plano save:', e.message));
+        } else {
+          App._dbData.planos = App._dbData.planos.filter(p => p.op_id !== opId);
+          delete this._planosMap[opId];
+          DB.removePlano(opId).catch(e => console.warn('[Asignacion] plano remove:', e.message));
+        }
+        App.renderPanel();
       });
     });
 
