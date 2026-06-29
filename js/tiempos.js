@@ -184,40 +184,64 @@ const Tiempos = {
         });
       }
 
-      // 2. Auto-fill ClickUp dates for main stages where they're not set yet
+      // 2. Sync to ClickUp for all main stages with data
       const fieldIds = App._data?.fieldIds || {};
-      let clickupUpdated = false;
+      console.log('[Tiempos] fieldIds disponibles:', JSON.stringify(fieldIds));
+      const cuErrors  = [];
+      let   cuSynced  = 0;
+
       for (const row of rows) {
         const etapa = row.dataset.etapa;
-        if (!STAGE_INICIO[etapa]) continue; // skip sub-stages (ensamble, sabanas, etc.)
+        if (!STAGE_INICIO[etapa]) continue; // skip sub-stages
         const fi = row.querySelector('.t-fi').value;
         const hi = row.querySelector('.t-hi').value;
         const ff = row.querySelector('.t-ff').value;
         const hf = row.querySelector('.t-hf').value;
 
-        const inicioKey = STAGE_INICIO[etapa];
-        const finKey    = STAGE_FIN[etapa];
+        const inicioKey  = STAGE_INICIO[etapa];
+        const finKey     = STAGE_FIN[etapa];
+        const inicioFId  = fieldIds[inicioKey];
+        const finFId     = fieldIds[finKey];
 
-        if (fi && fieldIds[inicioKey]) {
-          const ms = toMs(fi, hi);
-          if (ms) {
-            await PlantaAPI.setField(op.id, fieldIds[inicioKey], ms)
-              .catch(e => console.warn('[Tiempos] ClickUp inicio:', e.message));
-            op[inicioKey] = new Date(ms);
-            clickupUpdated = true;
+        if (fi) {
+          if (!inicioFId) {
+            cuErrors.push(`Sin campo ClickUp para ${inicioKey}`);
+          } else {
+            const ms = toMs(fi, hi);
+            if (ms) {
+              try {
+                await PlantaAPI.setField(op.id, inicioFId, ms);
+                op[inicioKey] = new Date(ms);
+                cuSynced++;
+              } catch (e) {
+                cuErrors.push(`Inicio ${STAGE_LABELS[etapa] || etapa}: ${e.message}`);
+              }
+            }
           }
         }
-        if (ff && fieldIds[finKey]) {
-          const ms = toMs(ff, hf);
-          if (ms) {
-            await PlantaAPI.setField(op.id, fieldIds[finKey], ms)
-              .catch(e => console.warn('[Tiempos] ClickUp fin:', e.message));
-            op[finKey] = new Date(ms);
-            clickupUpdated = true;
+        if (ff) {
+          if (!finFId) {
+            cuErrors.push(`Sin campo ClickUp para ${finKey}`);
+          } else {
+            const ms = toMs(ff, hf);
+            if (ms) {
+              try {
+                await PlantaAPI.setField(op.id, finFId, ms);
+                op[finKey] = new Date(ms);
+                cuSynced++;
+              } catch (e) {
+                cuErrors.push(`Fin ${STAGE_LABELS[etapa] || etapa}: ${e.message}`);
+              }
+            }
           }
         }
       }
-      if (clickupUpdated) PlantaAPI.clearCache();
+
+      if (cuSynced > 0) PlantaAPI.clearCache();
+      if (cuErrors.length) {
+        console.error('[Tiempos] ClickUp errors:', cuErrors);
+        alert('Guardado en base de datos ✓\nClickUp no se pudo actualizar:\n• ' + cuErrors.join('\n• '));
+      }
 
       btn.textContent = '✓ Guardado';
       App._dbData.tiempos = await DB.getAllTiempos().catch(() => App._dbData.tiempos);
