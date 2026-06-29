@@ -5,6 +5,15 @@
 const Tiempos = {
   _op: null,
 
+  _dateToFecha(d) {
+    if (!d) return '';
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  },
+  _dateToHora(d) {
+    if (!d) return '';
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  },
+
   async open(op) {
     this._op = op;
     const overlay = el('tiempos-overlay');
@@ -20,6 +29,23 @@ const Tiempos = {
       for (const t of (existing || [])) map[t.etapa] = t;
     } catch (e) {
       console.warn('[Tiempos] load failed:', e.message);
+    }
+
+    // Pre-populate from ClickUp dates for stages not yet in Supabase
+    for (const ts of TIEMPO_STAGES) {
+      if (map[ts.id]) continue;
+      const inicioKey  = STAGE_INICIO[ts.id];
+      const finKey     = STAGE_FIN[ts.id];
+      const inicioDate = op[inicioKey];
+      const finDate    = op[finKey];
+      if (inicioDate || finDate) {
+        map[ts.id] = {
+          fecha_inicio: this._dateToFecha(inicioDate),
+          hora_inicio:  this._dateToHora(inicioDate),
+          fecha_fin:    this._dateToFecha(finDate),
+          hora_fin:     this._dateToHora(finDate),
+        };
+      }
     }
 
     this._renderRows(map);
@@ -172,7 +198,7 @@ const Tiempos = {
         const inicioKey = STAGE_INICIO[etapa];
         const finKey    = STAGE_FIN[etapa];
 
-        if (fi && fieldIds[inicioKey] && !op[inicioKey]) {
+        if (fi && fieldIds[inicioKey]) {
           const ms = toMs(fi, hi);
           if (ms) {
             await PlantaAPI.setField(op.id, fieldIds[inicioKey], ms)
@@ -181,7 +207,7 @@ const Tiempos = {
             clickupUpdated = true;
           }
         }
-        if (ff && fieldIds[finKey] && !op[finKey]) {
+        if (ff && fieldIds[finKey]) {
           const ms = toMs(ff, hf);
           if (ms) {
             await PlantaAPI.setField(op.id, fieldIds[finKey], ms)
