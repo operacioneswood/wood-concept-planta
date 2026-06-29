@@ -37,12 +37,13 @@ const Proyectos = {
         <div class="asign-search-wrap">
           <input type="search" id="proy-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre...">
         </div>
-        ${Object.keys(avgMap).length ? this._renderAverages(avgMap) : ''}
+        ${Object.keys(avgMap).length ? this._renderAverages(avgMap, ops) : ''}
         ${[...groups.entries()].map(([proj, projOps]) =>
           this._renderGroup(proj, projOps, contratistas, tiemposMap)
         ).join('')}
       `;
       this._bindEvents(ops, contratistas);
+      this._bindAverages();
       this._bindSearch();
     }
 
@@ -186,41 +187,47 @@ const Proyectos = {
       const end   = new Date(`${t.fecha_fin}T${t.hora_fin || '00:00'}`);
       const mins  = Math.round((end - start) / 60000);
       if (isNaN(mins) || mins <= 0) continue;
-      if (!sums[t.etapa]) sums[t.etapa] = { total: 0, count: 0 };
+      if (!sums[t.etapa]) sums[t.etapa] = { total: 0, count: 0, items: [] };
       sums[t.etapa].total += mins;
       sums[t.etapa].count++;
+      sums[t.etapa].items.push({ op_id: t.op_id, nombre_op: t.nombre_op, mins });
     }
     const result = {};
     for (const [etapa, s] of Object.entries(sums)) {
-      result[etapa] = { avg: Math.round(s.total / s.count), count: s.count };
+      s.items.sort((a, b) => b.mins - a.mins);
+      result[etapa] = { avg: Math.round(s.total / s.count), count: s.count, items: s.items };
     }
     return result;
   },
 
-  _renderAverages(avgMap) {
+  _renderAverages(avgMap, ops) {
+    const noOpMap = {};
+    for (const op of (ops || [])) noOpMap[op.id] = op.noOp || '';
+
+    const renderItem = (label, color, { avg, count, items }, isSub) => {
+      const rows = items.map(it => `
+        <div class="prom-op-row">
+          ${noOpMap[it.op_id] ? `<span class="prom-op-num">${esc(noOpMap[it.op_id])}</span>` : ''}
+          <span class="prom-op-name">${esc(it.nombre_op || '—')}</span>
+          <span class="prom-op-dur">${this._fmtMins(it.mins)}</span>
+        </div>
+      `).join('');
+      return `
+        <div class="prom-item ${isSub ? 'prom-item-sub' : ''}">
+          <span class="prom-etapa" style="color:${color}">${isSub ? '↳ ' : ''}${esc(label)}</span>
+          <span class="prom-val">${this._fmtMins(avg)}</span>
+          <span class="prom-count">${count} OP${count !== 1 ? 's' : ''}</span>
+          <button class="prom-expand-btn" title="Ver OPs individuales">▼ ver</button>
+          <div class="prom-op-list" style="display:none">${rows}</div>
+        </div>
+      `;
+    };
+
     const items = [];
     for (const ts of TIEMPO_STAGES) {
-      if (avgMap[ts.id]) {
-        const { avg, count } = avgMap[ts.id];
-        items.push(`
-          <div class="prom-item">
-            <span class="prom-etapa" style="color:${ts.color}">${esc(ts.label)}</span>
-            <span class="prom-val">${this._fmtMins(avg)}</span>
-            <span class="prom-count">${count} OP${count !== 1 ? 's' : ''}</span>
-          </div>
-        `);
-      }
+      if (avgMap[ts.id]) items.push(renderItem(ts.label, ts.color, avgMap[ts.id], false));
       for (const sub of (ts.subs || [])) {
-        if (avgMap[sub.id]) {
-          const { avg, count } = avgMap[sub.id];
-          items.push(`
-            <div class="prom-item prom-item-sub">
-              <span class="prom-etapa" style="color:${ts.color}">↳ ${esc(sub.label)}</span>
-              <span class="prom-val">${this._fmtMins(avg)}</span>
-              <span class="prom-count">${count} OP${count !== 1 ? 's' : ''}</span>
-            </div>
-          `);
-        }
+        if (avgMap[sub.id]) items.push(renderItem(sub.label, ts.color, avgMap[sub.id], true));
       }
     }
     if (!items.length) return '';
@@ -230,6 +237,17 @@ const Proyectos = {
         <div class="promedios-grid">${items.join('')}</div>
       </div>
     `;
+  },
+
+  _bindAverages() {
+    document.querySelectorAll('.prom-expand-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const list   = btn.nextElementSibling;
+        const isOpen = list.style.display !== 'none';
+        list.style.display = isOpen ? 'none' : '';
+        btn.textContent    = isOpen ? '▼ ver' : '▲ ocultar';
+      });
+    });
   },
 
   _calcDuration(fi, hi, ff, hf) {

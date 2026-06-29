@@ -1172,6 +1172,25 @@ body {
 .t-sub-row td { background: var(--surface); }
 .t-sub-lbl { padding-left: 6px; font-weight: 500; font-size: 12px; opacity: 0.85; }
 .prom-item-sub { opacity: 0.88; transform: scale(0.94); transform-origin: left center; }
+.prom-expand-btn {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  font-size: 10px; padding: 1px 6px; cursor: pointer; color: var(--muted);
+  margin-top: 2px; touch-action: manipulation; font-family: inherit;
+}
+.prom-expand-btn:hover { background: var(--divider); color: var(--text); }
+.prom-op-list {
+  width: 100%; border-top: 1px solid var(--divider);
+  margin-top: 6px; padding-top: 4px;
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 180px; align-items: stretch;
+}
+.prom-op-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; padding: 2px 0;
+}
+.prom-op-num  { font-weight: 700; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
+.prom-op-name { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prom-op-dur  { font-weight: 700; color: var(--green); white-space: nowrap; flex-shrink: 0; }
 .t-inp {
   width: 100%; border: 1px solid var(--border);
   border-radius: 5px; padding: 4px 6px;
