@@ -6,7 +6,7 @@ const Cronograma = {
   _ops:      [],
   _dbData:   null,
   _fieldIds: {},
-  _sub:      'fabrica',   // persists across re-renders
+  _sub:      'fabrica',
 
   render({ ops, fieldIds, dbData }) {
     this._ops      = ops      || [];
@@ -46,12 +46,11 @@ const Cronograma = {
       byProject[proj].push(op);
     }
 
-    // Sort projects by earliest salidaFabrica; undated projects go last
+    // Sort projects: earliest due date first; undated projects last
     const sorted = Object.entries(byProject).sort(([, a], [, b]) => {
-      const earliest = arr => arr.reduce((min, op) => {
-        if (!op.salidaFabrica) return min;
-        return !min || op.salidaFabrica < min ? op.salidaFabrica : min;
-      }, null);
+      const earliest = arr => arr.reduce((min, op) =>
+        op.salidaFabrica && (!min || op.salidaFabrica < min) ? op.salidaFabrica : min
+      , null);
       const da = earliest(a), db = earliest(b);
       if (!da && !db) return 0;
       if (!da) return 1;
@@ -62,6 +61,9 @@ const Cronograma = {
     if (!sorted.length) return '<div class="cron-empty">Sin OPs activos.</div>';
 
     return sorted.map(([project, ops]) => {
+      const { overdue, urgent } = this._urgencyCounts(ops);
+      const urgHtml = this._urgBadgesHtml(overdue, urgent);
+
       const opsorted = [...ops].sort((a, b) => {
         if (!a.salidaFabrica && !b.salidaFabrica) return 0;
         if (!a.salidaFabrica) return 1;
@@ -89,12 +91,18 @@ const Cronograma = {
 
       return `
         <div class="cron-block">
-          <div class="cron-block-hdr">${esc(project)}</div>
+          <div class="cron-block-hdr">
+            <span class="cron-hdr-name">${esc(project)}</span>
+            <span class="cron-hdr-meta">
+              <span class="cron-hdr-count">${ops.length} OP${ops.length !== 1 ? 's' : ''}</span>
+              ${urgHtml}
+            </span>
+          </div>
           <table class="cron-tbl">
             <thead><tr>
               <th>No. OP</th>
               <th>Descripción</th>
-              <th>Salida Fábrica</th>
+              <th>Fecha límite</th>
               <th>Fecha</th>
               <th>Estado</th>
             </tr></thead>
@@ -108,47 +116,56 @@ const Cronograma = {
   // ── Pintura ───────────────────────────────────────────────
 
   _renderPintura() {
-    const assignments = App.buildAssignments(this._dbData);
+    // Only OPs in "en pintura" status that have a pintor assigned in ClickUp
+    const pinturaOps = this._ops.filter(op => op.status === 'en pintura' && op.pintor);
 
     const byPainter = {};
-    for (const op of this._ops) {
-      const paintAssigns = (assignments[op.id] || []).filter(a => a.stage === 'pintura');
-      for (const a of paintAssigns) {
-        if (!byPainter[a.person]) byPainter[a.person] = [];
-        byPainter[a.person].push({ op, comentario: a.comentario || '' });
-      }
+    for (const op of pinturaOps) {
+      if (!byPainter[op.pintor]) byPainter[op.pintor] = [];
+      byPainter[op.pintor].push(op);
     }
 
     const painters = Object.keys(byPainter).sort();
+
     if (!painters.length) {
       return `<div class="cron-empty">
-        Sin OPs asignados a pintores.
-        <span class="cron-empty-hint">Asigna OPs a un pintor desde Asignación (etapa Pintura).</span>
+        Sin OPs en pintura actualmente.
+        <span class="cron-empty-hint">Aparecen aquí los OPs con estado "EN PINTURA" y un pintor asignado en ClickUp.</span>
       </div>`;
     }
 
     return painters.map(painter => {
-      const items = [...byPainter[painter]].sort((a, b) => {
-        if (!a.op.salidaFabrica && !b.op.salidaFabrica) return 0;
-        if (!a.op.salidaFabrica) return 1;
-        if (!b.op.salidaFabrica) return -1;
-        return a.op.salidaFabrica - b.op.salidaFabrica;
+      // Sort by due date — most urgent first
+      const ops = [...byPainter[painter]].sort((a, b) => {
+        if (!a.salidaFabrica && !b.salidaFabrica) return 0;
+        if (!a.salidaFabrica) return 1;
+        if (!b.salidaFabrica) return -1;
+        return a.salidaFabrica - b.salidaFabrica;
       });
 
-      const rows = items.map(({ op, comentario }) => {
-        const recibido = op.inicioPintura ? this._fmtFull(op.inicioPintura) : '—';
+      const { overdue, urgent } = this._urgencyCounts(ops);
+      const urgHtml = this._urgBadgesHtml(overdue, urgent);
+
+      const rows = ops.map(op => {
         const st = this._statusInfo(op.salidaFabrica);
         return `
           <tr>
             <td class="cron-proyecto">${esc(op.project || '—')}</td>
             <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
             <td class="cron-name">${esc(op.name)}</td>
-            <td class="cron-recibido">${recibido}</td>
+            <td>
+              <input type="date" class="cron-date-inp"
+                data-opid="${esc(op.id)}"
+                data-fieldkey="inicioPintura"
+                value="${this._toInputVal(op.inicioPintura)}"
+                title="Inicio Pintura — edita y sincroniza a ClickUp">
+            </td>
             <td>
               <input type="date" class="cron-date-inp"
                 data-opid="${esc(op.id)}"
                 data-fieldkey="salidaFabrica"
-                value="${this._toInputVal(op.salidaFabrica)}">
+                value="${this._toInputVal(op.salidaFabrica)}"
+                title="Fecha límite — edita y sincroniza a ClickUp">
             </td>
             <td>
               <input type="text" class="cron-text-inp"
@@ -157,7 +174,6 @@ const Cronograma = {
                 value="${esc(op.acabado || '')}"
                 placeholder="Acabado...">
             </td>
-            <td class="cron-comentario">${esc(comentario)}</td>
             <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
           </tr>
         `;
@@ -165,16 +181,21 @@ const Cronograma = {
 
       return `
         <div class="cron-block">
-          <div class="cron-block-hdr cron-painter-hdr">🎨 ${esc(painter)}</div>
+          <div class="cron-block-hdr cron-painter-hdr">
+            <span class="cron-hdr-name">🎨 ${esc(painter)}</span>
+            <span class="cron-hdr-meta">
+              <span class="cron-hdr-count">${ops.length} OP${ops.length !== 1 ? 's' : ''}</span>
+              ${urgHtml}
+            </span>
+          </div>
           <table class="cron-tbl cron-tbl-wide">
             <thead><tr>
               <th>Cliente</th>
               <th>No. OP</th>
               <th>Descripción</th>
-              <th>Fecha Recibido</th>
+              <th>Inicio Pintura</th>
               <th>Fecha Entrega</th>
               <th>Acabado</th>
-              <th>Comentarios</th>
               <th>Estado</th>
             </tr></thead>
             <tbody>${rows}</tbody>
@@ -185,6 +206,25 @@ const Cronograma = {
   },
 
   // ── Helpers ───────────────────────────────────────────────
+
+  _urgencyCounts(ops) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    let overdue = 0, urgent = 0;
+    for (const op of ops) {
+      if (!op.salidaFabrica) continue;
+      const diff = Math.ceil((op.salidaFabrica - today) / 86400000);
+      if (diff < 0) overdue++;
+      else if (diff <= 7) urgent++;
+    }
+    return { overdue, urgent };
+  },
+
+  _urgBadgesHtml(overdue, urgent) {
+    const parts = [];
+    if (overdue > 0) parts.push(`<span class="cron-urg cron-red">${overdue} vencido${overdue > 1 ? 's' : ''}</span>`);
+    if (urgent  > 0) parts.push(`<span class="cron-urg cron-amber">${urgent} urgente${urgent > 1 ? 's' : ''}</span>`);
+    return parts.join('');
+  },
 
   _statusInfo(d) {
     if (!d) return { label: 'Sin fecha', cls: 'cron-none' };
@@ -202,11 +242,6 @@ const Cronograma = {
     return `${d.getDate()} ${months[d.getMonth()]}`;
   },
 
-  _fmtFull(d) {
-    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-  },
-
   _toInputVal(d) {
     if (!d) return '';
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -219,15 +254,25 @@ const Cronograma = {
       inp.addEventListener('change', async () => {
         const { opid, fieldkey } = inp.dataset;
         const op = App._data?.ops.find(o => o.id === opid);
-        if (!op) { console.warn('[Cronograma] op not found:', opid); return; }
+        if (!op) return;
         const val = inp.value;
         if (!val) return;
-        // Midnight local → correct calendar day in ClickUp (date-only mode)
         const ms = new Date(val + 'T00:00:00').getTime();
         inp.disabled = true;
         try {
-          // salidaFabrica uses the built-in ClickUp due date (PUT /task)
-          await PlantaAPI.setDueDate(opid, ms);
+          if (fieldkey === 'salidaFabrica') {
+            // Built-in ClickUp due date
+            await PlantaAPI.setDueDate(opid, ms);
+          } else {
+            // Custom date field (e.g. inicioPintura)
+            const fid = this._fieldIds[fieldkey];
+            if (!fid) {
+              alert(`Campo ClickUp no detectado para "${fieldkey}". Haz ↻ forzar sincronización.`);
+              inp.disabled = false;
+              return;
+            }
+            await PlantaAPI.setField(opid, fid, ms);
+          }
           op[fieldkey] = new Date(ms);
           inp.style.outline = '2px solid var(--green)';
           setTimeout(() => { inp.style.outline = ''; inp.disabled = false; }, 1200);
@@ -245,11 +290,7 @@ const Cronograma = {
         const { opid, fieldkey } = inp.dataset;
         const fid = this._fieldIds[fieldkey];
         const op  = App._data?.ops.find(o => o.id === opid);
-        if (!op)  { console.warn('[Cronograma] op not found:', opid); return; }
-        if (!fid) {
-          alert(`Campo "${fieldkey}" no encontrado en ClickUp. Crea el campo "Acabado" (tipo Short Text) en ClickUp y recarga.`);
-          return;
-        }
+        if (!op || !fid) return;
         inp.disabled = true;
         try {
           await PlantaAPI.setField(opid, fid, inp.value.trim());

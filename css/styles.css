@@ -1276,7 +1276,27 @@ body {
   text-transform: uppercase;
   color: var(--muted);
   border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
+.cron-hdr-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cron-hdr-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.cron-hdr-count { font-size: 0.72rem; color: var(--faint); font-weight: 500; letter-spacing: 0; text-transform: none; }
+
+/* Urgency indicator badges in project/painter headers */
+.cron-urg {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .cron-painter-hdr { background: var(--accent-bg); color: var(--accent); }
 
 .cron-tbl {

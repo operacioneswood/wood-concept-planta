@@ -172,6 +172,7 @@ const PlantaAPI = {
         ebanista:           find('ebanista'),
         cliente:            find('cliente'),
         acabado:            find('acabado'),
+        pintor:             find('pintor'),
       },
       ebanistas: [...ebanistasSet].sort(),
       pintores:  [...pintoresSet].sort(),
@@ -236,6 +237,11 @@ const PlantaAPI = {
       acabado: (() => {
         const v = getField(fieldIds.acabado);
         return v === null || v === undefined ? '' : (typeof v === 'object' ? (v.name || '') : String(v));
+      })(),
+      pintor: (() => {
+        const v = getField(fieldIds.pintor);
+        return typeof v === 'object' && v?.name ? v.name :
+               typeof v === 'string' ? v : null;
       })(),
     };
   },
