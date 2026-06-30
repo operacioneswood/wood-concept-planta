@@ -1227,3 +1227,155 @@ body {
   padding: 1px 6px; white-space: nowrap;
 }
 .tablet .tiempos-table td { padding: 7px 6px; }
+
+/* ════════════════════════════════════════════════════════════
+   CRONOGRAMA
+   ════════════════════════════════════════════════════════════ */
+#cronograma-container { min-height: 200px; }
+
+.cron-subtabs {
+  display: flex;
+  gap: 0;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+  position: sticky;
+  top: var(--nav-h);
+  z-index: 10;
+}
+.cron-subtab {
+  padding: 12px 20px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color .15s, border-color .15s;
+}
+.cron-subtab:hover { color: var(--text); }
+.cron-subtab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+.cron-body { padding: 20px; }
+
+.cron-block {
+  margin-bottom: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.cron-block-hdr {
+  padding: 9px 16px;
+  background: var(--card);
+  font-weight: 700;
+  font-size: 0.76rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.cron-painter-hdr { background: var(--accent-bg); color: var(--accent); }
+
+.cron-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  background: var(--card);
+}
+.cron-tbl-wide { min-width: 780px; }
+.cron-tbl th {
+  padding: 7px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--faint);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.cron-tbl td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--divider);
+  vertical-align: middle;
+}
+.cron-tbl tr:last-child td { border-bottom: none; }
+.cron-tbl tr:hover td { background: #fdf9f6; }
+
+.cron-op-num    { font-weight: 700; font-size: 0.8rem; color: var(--accent); }
+.cron-name      { max-width: 240px; }
+.cron-proyecto  { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+.cron-recibido  { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+.cron-comentario{ color: var(--muted); font-size: 0.78rem; max-width: 200px; }
+.cron-fecha-lbl { font-weight: 600; font-size: 0.8rem; white-space: nowrap; }
+.cron-faint     { color: var(--faint); }
+
+.cron-date-inp {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color .15s, outline .15s;
+}
+.cron-date-inp:hover { border-color: var(--accent); }
+.cron-date-inp:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+.cron-text-inp {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  color: var(--text);
+  width: 115px;
+  font-family: inherit;
+  transition: border-color .15s, outline .15s;
+}
+.cron-text-inp:hover { border-color: var(--accent); }
+.cron-text-inp:focus { outline: 2px solid var(--accent); border-color: transparent; }
+
+/* Status badges */
+.cron-badge {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cron-none  { background: var(--slate-bg);  color: var(--muted); font-weight: 400; }
+.cron-green { background: var(--green-bg);  color: var(--green); }
+.cron-amber { background: var(--amber-bg);  color: var(--amber); }
+.cron-red   { background: var(--red-bg);    color: var(--red);   }
+
+.cron-empty {
+  padding: 56px 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  background: var(--card);
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+}
+.cron-empty-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--faint);
+}
+
+/* Horizontal scroll for wide pintura table */
+.cron-block { overflow-x: auto; }
+
+/* Tablet */
+.tablet .cron-body { padding: 12px; }
+.tablet .cron-date-inp,
+.tablet .cron-text-inp { font-size: 16px !important; min-height: 40px; }

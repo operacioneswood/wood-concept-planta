@@ -165,6 +165,7 @@ const App = {
     Tablero.render(payload);
     Proyectos.render(payload);
     Asignacion.render(payload);
+    Cronograma.render(payload);
     Rendimiento.render(payload);
     this._renderRolesList();
   },

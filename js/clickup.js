@@ -37,6 +37,7 @@ const PlantaAPI = {
       'inicioCorte','finCorte','inicioChapilla','finChapilla',
       'inicioEnchape','finEnchape','inicioArmado','finArmado',
       'inicioPintura','finPintura','inicioReproceso','finReproceso',
+      'salidaFabrica',
     ];
     const out = { ...op };
     for (const k of dateKeys) {
@@ -170,6 +171,8 @@ const PlantaAPI = {
         nivel:              find('nivel'),
         ebanista:           find('ebanista'),
         cliente:            find('cliente'),
+        salidaFabrica:      find('salida fabrica', 'salida de fabrica', 'fecha salida'),
+        acabado:            find('acabado'),
       },
       ebanistas: [...ebanistasSet].sort(),
       pintores:  [...pintoresSet].sort(),
@@ -230,6 +233,11 @@ const PlantaAPI = {
       inicioReproceso:     getDate(fieldIds.inicioReproceso),
       finReproceso:        getDate(fieldIds.finReproceso),
       causaReproceso:      causa,
+      salidaFabrica:       getDate(fieldIds.salidaFabrica),
+      acabado: (() => {
+        const v = getField(fieldIds.acabado);
+        return v === null || v === undefined ? '' : (typeof v === 'object' ? (v.name || '') : String(v));
+      })(),
     };
   },
 
