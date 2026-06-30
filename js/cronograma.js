@@ -218,24 +218,19 @@ const Cronograma = {
     root.querySelectorAll('.cron-date-inp').forEach(inp => {
       inp.addEventListener('change', async () => {
         const { opid, fieldkey } = inp.dataset;
-        const fid = this._fieldIds[fieldkey];
-        const op  = App._data?.ops.find(o => o.id === opid);
-        if (!op)  { console.warn('[Cronograma] op not found:', opid); return; }
-        if (!fid) {
-          alert(`Campo "${fieldkey}" no encontrado en ClickUp. Crea el campo "Salida Fabrica" (tipo Date) en ClickUp y recarga.`);
-          return;
-        }
+        const op = App._data?.ops.find(o => o.id === opid);
+        if (!op) { console.warn('[Cronograma] op not found:', opid); return; }
         const val = inp.value;
         if (!val) return;
-        // Use noon to avoid timezone off-by-one issues
-        const ms = new Date(val + 'T12:00:00').getTime();
+        // Midnight local → correct calendar day in ClickUp (date-only mode)
+        const ms = new Date(val + 'T00:00:00').getTime();
         inp.disabled = true;
         try {
-          await PlantaAPI.setField(opid, fid, ms);
+          // salidaFabrica uses the built-in ClickUp due date (PUT /task)
+          await PlantaAPI.setDueDate(opid, ms);
           op[fieldkey] = new Date(ms);
           inp.style.outline = '2px solid var(--green)';
           setTimeout(() => { inp.style.outline = ''; inp.disabled = false; }, 1200);
-          // Re-draw to update the formatted date label and badge
           this._draw();
         } catch (e) {
           alert('Error al actualizar ClickUp: ' + e.message);

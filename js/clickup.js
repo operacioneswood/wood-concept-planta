@@ -171,7 +171,6 @@ const PlantaAPI = {
         nivel:              find('nivel'),
         ebanista:           find('ebanista'),
         cliente:            find('cliente'),
-        salidaFabrica:      find('salida fabrica', 'salida de fabrica', 'fecha salida'),
         acabado:            find('acabado'),
       },
       ebanistas: [...ebanistasSet].sort(),
@@ -233,7 +232,7 @@ const PlantaAPI = {
       inicioReproceso:     getDate(fieldIds.inicioReproceso),
       finReproceso:        getDate(fieldIds.finReproceso),
       causaReproceso:      causa,
-      salidaFabrica:       getDate(fieldIds.salidaFabrica),
+      salidaFabrica:       tsToDate(raw.due_date || null),
       acabado: (() => {
         const v = getField(fieldIds.acabado);
         return v === null || v === undefined ? '' : (typeof v === 'object' ? (v.name || '') : String(v));
@@ -257,6 +256,25 @@ const PlantaAPI = {
       throw new Error(`ClickUp field ${res.status}: ${msg}`);
     }
     // ClickUp may return empty body on success — handle gracefully
+    const text = await res.text();
+    try { return text ? JSON.parse(text) : {}; }
+    catch { return {}; }
+  },
+
+  // ── Set the built-in due date on a task ─────────────────
+  async setDueDate(taskId, ms) {
+    const apiKey = this.getApiKey();
+    console.log(`[CU] setDueDate task=${taskId} ms=${ms}`);
+    const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}`, {
+      method:  'PUT',
+      headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ due_date: ms, due_date_time: false }),
+    });
+    console.log(`[CU] setDueDate HTTP ${res.status}`);
+    if (!res.ok) {
+      const msg = await res.text().catch(() => String(res.status));
+      throw new Error(`ClickUp due_date ${res.status}: ${msg}`);
+    }
     const text = await res.text();
     try { return text ? JSON.parse(text) : {}; }
     catch { return {}; }
