@@ -188,14 +188,35 @@ const PlantaAPI = {
       return cf.value ?? null;
     };
 
+    // ClickUp dropdown fields return the selected option's orderindex (integer).
+    // Look it up in type_config.options to get the name.
+    const getDropdownName = id => {
+      if (!id) return null;
+      const cf = (raw.custom_fields || []).find(f => f.id === id);
+      if (!cf) return null;
+      const v = cf.value;
+      if (v === null || v === undefined) return null;
+      // Already an object with name (some ClickUp plans return this)
+      if (typeof v === 'object' && v?.name) return v.name;
+      // Plain string name
+      if (typeof v === 'string' && isNaN(Number(v))) return v;
+      // Numeric orderindex — look up in type_config.options
+      const idx = typeof v === 'number' ? v : Number(v);
+      if (!isNaN(idx)) {
+        const opts = cf.type_config?.options || [];
+        const opt  = opts.find(o => o.orderindex === idx) ||
+                     opts.find(o => String(o.id) === String(v));
+        return opt?.name || null;
+      }
+      return null;
+    };
+
     const getDate = id => tsToDate(getField(id));
 
     const nivelRaw  = getField(fieldIds.nivel);
     const nivel     = nivelRaw !== null && nivelRaw !== '' ? (parseFloat(nivelRaw) || null) : null;
 
-    const ebanVal   = getField(fieldIds.ebanista);
-    const ebanista  = typeof ebanVal === 'object' && ebanVal?.name ? ebanVal.name :
-                      typeof ebanVal === 'string' ? ebanVal : null;
+    const ebanista  = getDropdownName(fieldIds.ebanista);
 
     const clientVal = getField(fieldIds.cliente);
     const client    = typeof clientVal === 'string' ? clientVal :
@@ -219,6 +240,7 @@ const PlantaAPI = {
       status:              normStr(raw.status?.status || ''),
       statusRaw:           raw.status?.status || '',
       ebanista,
+      pintor:              getDropdownName(fieldIds.pintor),
       // Stage dates
       inicioCorte:         getDate(fieldIds.inicioCorte),
       finCorte:            getDate(fieldIds.finCorte),
@@ -237,11 +259,6 @@ const PlantaAPI = {
       acabado: (() => {
         const v = getField(fieldIds.acabado);
         return v === null || v === undefined ? '' : (typeof v === 'object' ? (v.name || '') : String(v));
-      })(),
-      pintor: (() => {
-        const v = getField(fieldIds.pintor);
-        return typeof v === 'object' && v?.name ? v.name :
-               typeof v === 'string' ? v : null;
       })(),
     };
   },
