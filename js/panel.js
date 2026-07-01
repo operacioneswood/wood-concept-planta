@@ -184,13 +184,28 @@ const Panel = {
   },
 
   // ── Order persistence ─────────────────────────────────────
+  // Primary: in-memory map (survives auto-refresh re-renders).
+  // Backup: localStorage (survives F5 / browser refresh).
+  _orders: {},   // { [personName]: [opId, opId, ...] }
+
   _getOrder(name) {
-    try { return JSON.parse(localStorage.getItem('wp_panel_order_' + name)) || []; }
-    catch { return []; }
+    // In-memory takes priority — always up-to-date within the session
+    if (this._orders[name]?.length) return this._orders[name];
+    // Fallback to localStorage on first load
+    try {
+      const saved = JSON.parse(localStorage.getItem('wp_panel_order_' + name));
+      if (Array.isArray(saved) && saved.length) {
+        this._orders[name] = saved;   // warm the in-memory cache
+        return saved;
+      }
+    } catch {}
+    return [];
   },
 
   _setOrder(name, ids) {
-    localStorage.setItem('wp_panel_order_' + name, JSON.stringify(ids));
+    this._orders[name] = ids;         // always update in-memory
+    try { localStorage.setItem('wp_panel_order_' + name, JSON.stringify(ids)); }
+    catch (e) { console.warn('[Panel] order save failed:', e.message); }
   },
 
   // ── ▲/▼ move buttons ─────────────────────────────────────
