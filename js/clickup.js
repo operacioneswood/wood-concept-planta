@@ -172,11 +172,10 @@ const PlantaAPI = {
       nivel:              find('nivel'),
       ebanista:           find('ebanista'),
       cliente:            find('cliente'),
-      acabado:            find('acabado'),
+      acabado:            fieldMap['acabado']?.id || null,   // exact match — avoids 'inicio acabado' date fields
       pintor:             find('pintor'),
     };
-    console.log('[CU] fieldIds.acabado =', fieldIds.acabado,
-                '| type =', fieldMap[Object.keys(fieldMap).find(k => k.includes('acabado'))]?.type);
+    console.log('[CU] _detectFields fieldIds:', JSON.stringify(fieldIds));
 
     return {
       fieldIds,
@@ -263,23 +262,10 @@ const PlantaAPI = {
       causaReproceso:      causa,
       salidaFabrica:       tsToDate(raw.due_date || null),
       acabado: (() => {
-        const cf = (raw.custom_fields || []).find(f => f.id === fieldIds.acabado);
-        if (!cf) return '';
-        const v = cf.value;
+        const v = getField(fieldIds.acabado);
         if (v === null || v === undefined) return '';
-        console.log(`[CU] acabado raw for ${raw.id}: type=${cf.type} value=`, v);
-        // If ClickUp field is a date type, format it
-        if (cf.type === 'date' && (typeof v === 'number' || /^\d{10,13}$/.test(String(v)))) {
-          const ms = typeof v === 'number' ? v : Number(v);
-          const d = new Date(ms);
-          const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-          return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-        }
         if (typeof v === 'object') return v.name || '';
-        const str = String(v).trim();
-        // Pure numeric string in a text field = bad data, hide it
-        if (/^\d+$/.test(str)) return '';
-        return str;
+        return String(v);
       })(),
     };
   },
