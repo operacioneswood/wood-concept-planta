@@ -152,28 +152,34 @@ const PlantaAPI = {
       return null;
     };
 
+    console.log('[CU] _detectFields — all normalized field names:', Object.keys(fieldMap));
+
+    const fieldIds = {
+      inicioCorte:        find('inicio corte'),
+      finCorte:           find('fin corte'),
+      inicioChapilla:     find('inicio chapilla'),
+      finChapilla:        find('fin chapilla'),
+      inicioEnchape:      find('inicio enchape', 'inicio enchapillado'),
+      finEnchape:         find('fin enchape', 'fin enchapillado'),
+      inicioArmado:       find('inicio armado'),
+      finArmado:          find('fin armado'),
+      inicioPintura:      find('inicio pintura'),
+      finPintura:         find('fin pintura'),
+      inicioReproceso:    find('inicio reproceso'),
+      finReproceso:       find('fin reproceso'),
+      causaReproceso:     find('causa reproceso'),
+      noOp:               find('no. op', 'no op', 'nro. op', 'nro op', 'numero op', 'num op'),
+      nivel:              find('nivel'),
+      ebanista:           find('ebanista'),
+      cliente:            find('cliente'),
+      acabado:            find('acabado'),
+      pintor:             find('pintor'),
+    };
+    console.log('[CU] fieldIds.acabado =', fieldIds.acabado,
+                '| type =', fieldMap[Object.keys(fieldMap).find(k => k.includes('acabado'))]?.type);
+
     return {
-      fieldIds: {
-        inicioCorte:        find('inicio corte'),
-        finCorte:           find('fin corte'),
-        inicioChapilla:     find('inicio chapilla'),
-        finChapilla:        find('fin chapilla'),
-        inicioEnchape:      find('inicio enchape', 'inicio enchapillado'),
-        finEnchape:         find('fin enchape', 'fin enchapillado'),
-        inicioArmado:       find('inicio armado'),
-        finArmado:          find('fin armado'),
-        inicioPintura:      find('inicio pintura'),
-        finPintura:         find('fin pintura'),
-        inicioReproceso:    find('inicio reproceso'),
-        finReproceso:       find('fin reproceso'),
-        causaReproceso:     find('causa reproceso'),
-        noOp:               find('no. op', 'no op', 'nro. op', 'nro op', 'numero op', 'num op'),
-        nivel:              find('nivel'),
-        ebanista:           find('ebanista'),
-        cliente:            find('cliente'),
-        acabado:            find('acabado'),
-        pintor:             find('pintor'),
-      },
+      fieldIds,
       ebanistas: [...ebanistasSet].sort(),
       pintores:  [...pintoresSet].sort(),
     };
@@ -257,8 +263,23 @@ const PlantaAPI = {
       causaReproceso:      causa,
       salidaFabrica:       tsToDate(raw.due_date || null),
       acabado: (() => {
-        const v = getField(fieldIds.acabado);
-        return v === null || v === undefined ? '' : (typeof v === 'object' ? (v.name || '') : String(v));
+        const cf = (raw.custom_fields || []).find(f => f.id === fieldIds.acabado);
+        if (!cf) return '';
+        const v = cf.value;
+        if (v === null || v === undefined) return '';
+        console.log(`[CU] acabado raw for ${raw.id}: type=${cf.type} value=`, v);
+        // If ClickUp field is a date type, format it
+        if (cf.type === 'date' && (typeof v === 'number' || /^\d{10,13}$/.test(String(v)))) {
+          const ms = typeof v === 'number' ? v : Number(v);
+          const d = new Date(ms);
+          const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+          return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+        }
+        if (typeof v === 'object') return v.name || '';
+        const str = String(v).trim();
+        // Pure numeric string in a text field = bad data, hide it
+        if (/^\d+$/.test(str)) return '';
+        return str;
       })(),
     };
   },
