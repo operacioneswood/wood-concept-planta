@@ -7,6 +7,7 @@ const Cronograma = {
   _dbData:   null,
   _fieldIds: {},
   _sub:      'fabrica',
+  _fabView:  'proyecto',   // 'proyecto' | 'urgencia'
 
   render({ ops, fieldIds, dbData }) {
     this._ops      = ops      || [];
@@ -33,12 +34,33 @@ const Cronograma = {
         this._draw();
       });
     });
+    wrap.querySelectorAll('.cron-view-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._fabView = btn.dataset.view;
+        this._draw();
+      });
+    });
     this._bindEdits(wrap);
   },
 
   // ── Fábrica ───────────────────────────────────────────────
 
+  _fabViewToggle() {
+    return `
+      <div class="cron-view-toggle">
+        <button class="cron-view-btn ${this._fabView === 'proyecto' ? 'active' : ''}" data-view="proyecto">Por proyecto</button>
+        <button class="cron-view-btn ${this._fabView === 'urgencia' ? 'active' : ''}" data-view="urgencia">Por urgencia</button>
+      </div>
+    `;
+  },
+
   _renderFabrica() {
+    return this._fabView === 'urgencia'
+      ? this._fabViewToggle() + this._renderFabricaUrgencia()
+      : this._fabViewToggle() + this._renderFabricaProyecto();
+  },
+
+  _renderFabricaProyecto() {
     const byProject = {};
     for (const op of this._ops) {
       const proj = op.project || 'Sin proyecto';
@@ -46,7 +68,6 @@ const Cronograma = {
       byProject[proj].push(op);
     }
 
-    // Sort projects: earliest due date first; undated projects last
     const sorted = Object.entries(byProject).sort(([, a], [, b]) => {
       const earliest = arr => arr.reduce((min, op) =>
         op.salidaFabrica && (!min || op.salidaFabrica < min) ? op.salidaFabrica : min
@@ -111,6 +132,66 @@ const Cronograma = {
         </div>
       `;
     }).join('');
+  },
+
+  _renderFabricaUrgencia() {
+    // All OPs except those in pintura, sorted most urgent first
+    const fabOps = this._ops
+      .filter(op => op.status !== 'en pintura')
+      .sort((a, b) => {
+        if (!a.salidaFabrica && !b.salidaFabrica) return 0;
+        if (!a.salidaFabrica) return 1;
+        if (!b.salidaFabrica) return -1;
+        return a.salidaFabrica - b.salidaFabrica;
+      });
+
+    if (!fabOps.length) return '<div class="cron-empty">Sin OPs en fábrica.</div>';
+
+    const { overdue, urgent } = this._urgencyCounts(fabOps);
+
+    const rows = fabOps.map(op => {
+      const st = this._statusInfo(op.salidaFabrica);
+      return `
+        <tr>
+          <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
+          <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
+          <td class="cron-proyecto">${esc(op.project || '—')}</td>
+          <td class="cron-name">${esc(op.name)}</td>
+          <td class="cron-etapa-lbl">${esc(op.statusRaw || op.status)}</td>
+          <td>
+            <input type="date" class="cron-date-inp"
+              data-opid="${esc(op.id)}"
+              data-fieldkey="salidaFabrica"
+              value="${this._toInputVal(op.salidaFabrica)}">
+          </td>
+          <td class="cron-fecha-lbl">${op.salidaFabrica ? this._fmtShort(op.salidaFabrica) : '<span class="cron-faint">—</span>'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="cron-block">
+        <div class="cron-block-hdr">
+          <span class="cron-hdr-name">Todos los OPs en fábrica</span>
+          <span class="cron-hdr-meta">
+            <span class="cron-hdr-count">${fabOps.length} OPs</span>
+            ${this._urgBadgesHtml(overdue, urgent)}
+          </span>
+        </div>
+        <table class="cron-tbl cron-tbl-wide">
+          <thead><tr>
+            <th>Estado</th>
+            <th>No. OP</th>
+            <th>Proyecto</th>
+            <th>Descripción</th>
+            <th>Etapa</th>
+            <th>Fecha límite</th>
+            <th>Fecha</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
   },
 
   // ── Pintura ───────────────────────────────────────────────

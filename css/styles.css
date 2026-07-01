@@ -1385,6 +1385,36 @@ body {
   border-radius: var(--r);
   border: 1px solid var(--border);
 }
+/* View toggle (Por proyecto / Por urgencia) */
+.cron-view-toggle {
+  display: flex;
+  gap: 6px;
+  padding: 12px 0 4px;
+}
+.cron-view-btn {
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.cron-view-btn:hover { border-color: var(--accent); color: var(--accent); }
+.cron-view-btn.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.cron-etapa-lbl {
+  font-size: 0.75rem;
+  color: var(--muted);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
 .cron-empty-hint {
   display: block;
   margin-top: 8px;
