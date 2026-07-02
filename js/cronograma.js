@@ -40,6 +40,8 @@ const Cronograma = {
         this._draw();
       });
     });
+    const printBtn = wrap.querySelector('#btn-print-pintura');
+    if (printBtn) printBtn.addEventListener('click', () => this._printPintura());
     this._bindEdits(wrap);
   },
 
@@ -197,7 +199,6 @@ const Cronograma = {
   // ── Pintura ───────────────────────────────────────────────
 
   _renderPintura() {
-    // Only OPs in "en pintura" status that have a pintor assigned in ClickUp
     const pinturaOps = this._ops.filter(op => op.status === 'en pintura' && op.pintor);
 
     const byPainter = {};
@@ -215,8 +216,7 @@ const Cronograma = {
       </div>`;
     }
 
-    return painters.map(painter => {
-      // Sort by due date — most urgent first
+    const paintTables = painters.map(painter => {
       const ops = [...byPainter[painter]].sort((a, b) => {
         if (!a.salidaFabrica && !b.salidaFabrica) return 0;
         if (!a.salidaFabrica) return 1;
@@ -239,14 +239,14 @@ const Cronograma = {
                 data-opid="${esc(op.id)}"
                 data-fieldkey="inicioPintura"
                 value="${this._toInputVal(op.inicioPintura)}"
-                title="Inicio Pintura — edita y sincroniza a ClickUp">
+                title="Inicio Pintura">
             </td>
             <td>
               <input type="date" class="cron-date-inp"
                 data-opid="${esc(op.id)}"
                 data-fieldkey="salidaFabrica"
                 value="${this._toInputVal(op.salidaFabrica)}"
-                title="Fecha límite — edita y sincroniza a ClickUp">
+                title="Fecha Entrega">
             </td>
             <td>
               <input type="text" class="cron-text-inp"
@@ -284,6 +284,156 @@ const Cronograma = {
         </div>
       `;
     }).join('');
+
+    return `
+      <div class="cron-print-bar">
+        <button class="cron-print-btn" id="btn-print-pintura">🖨 Imprimir cronogramas</button>
+      </div>
+      ${paintTables}
+    `;
+  },
+
+  // ── Print pintura schedules ────────────────────────────────
+  _printPintura() {
+    const pinturaOps = this._ops.filter(op => op.status === 'en pintura' && op.pintor);
+    const byPainter  = {};
+    for (const op of pinturaOps) {
+      if (!byPainter[op.pintor]) byPainter[op.pintor] = [];
+      byPainter[op.pintor].push(op);
+    }
+    const painters = Object.keys(byPainter).sort();
+
+    const today   = new Date();
+    const months  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const todayFmt = `${today.getDate()} de ${months[today.getMonth()]} de ${today.getFullYear()}`;
+
+    const paintersHtml = painters.map((painter, pi) => {
+      const ops = [...byPainter[painter]].sort((a, b) => {
+        if (!a.salidaFabrica && !b.salidaFabrica) return 0;
+        if (!a.salidaFabrica) return 1;
+        if (!b.salidaFabrica) return -1;
+        return a.salidaFabrica - b.salidaFabrica;
+      });
+
+      const rows = ops.map((op, idx) => {
+        const st = this._statusInfo(op.salidaFabrica);
+        const stClass = st.cls === 'cron-red' ? 'st-red' : st.cls === 'cron-amber' ? 'st-amber' : st.cls === 'cron-green' ? 'st-green' : 'st-none';
+        return `<tr>
+          <td class="td-num">${idx + 1}</td>
+          <td class="td-proj">${esc(op.project || '—')}</td>
+          <td class="td-op">${esc(op.noOp || '—')}</td>
+          <td class="td-desc">${esc(op.name)}</td>
+          <td class="td-date">${op.inicioPintura ? this._fmtLong(op.inicioPintura) : ''}</td>
+          <td class="td-date">${op.salidaFabrica ? this._fmtLong(op.salidaFabrica) : ''}</td>
+          <td class="td-aca">${esc(op.acabado || '')}</td>
+          <td class="td-est ${stClass}">${st.label}</td>
+        </tr>`;
+      }).join('');
+
+      const pageBreak = pi > 0 ? 'page-break-before:always;' : '';
+      return `
+        <div class="painter-page" style="${pageBreak}">
+          <div class="painter-hdr">
+            <div class="painter-title">Cronograma de Pintura — ${esc(painter)}</div>
+            <div class="painter-date">${todayFmt}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th class="td-num">#</th>
+                <th class="td-proj">Cliente / Proyecto</th>
+                <th class="td-op">No. OP</th>
+                <th class="td-desc">Descripción</th>
+                <th class="td-date">Inicio Pintura</th>
+                <th class="td-date">Fecha Entrega</th>
+                <th class="td-aca">Acabado</th>
+                <th class="td-est">Estado</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="tbl-footer">${ops.length} ítem${ops.length !== 1 ? 's' : ''} · Wood Concept Planta</div>
+        </div>
+      `;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cronograma Pintura — ${todayFmt}</title>
+<style>
+  @page { size: letter portrait; margin: 0.65in 0.75in; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 9.5pt; color: #111; background: #fff; }
+
+  .painter-page { width: 100%; }
+
+  /* ── Page header ── */
+  .painter-hdr {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 2.5pt solid #8B1A1A;
+    padding-bottom: 8pt;
+    margin-bottom: 12pt;
+  }
+  .painter-title { font-size: 14pt; font-weight: 700; color: #8B1A1A; letter-spacing: -0.02em; }
+  .painter-date  { font-size: 8.5pt; color: #666; }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: #f4eeea; }
+  th {
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #555;
+    padding: 6pt 7pt;
+    text-align: left;
+    border-bottom: 1.5pt solid #c8b8b0;
+    white-space: nowrap;
+  }
+  td {
+    padding: 5.5pt 7pt;
+    border-bottom: 0.5pt solid #e8e0db;
+    vertical-align: middle;
+    line-height: 1.3;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) { background: #faf8f6; }
+
+  /* ── Column widths ── */
+  .td-num  { width: 22pt;  text-align: center; color: #888; font-size: 8pt; }
+  .td-proj { width: 120pt; font-size: 8.5pt; color: #444; }
+  .td-op   { width: 56pt;  font-weight: 700; color: #8B1A1A; white-space: nowrap; }
+  .td-desc { }
+  .td-date { width: 68pt;  white-space: nowrap; font-size: 8.5pt; }
+  .td-aca  { width: 72pt;  font-size: 8.5pt; }
+  .td-est  { width: 54pt;  font-weight: 700; font-size: 8pt; text-align: center; white-space: nowrap; }
+
+  /* ── Status colors ── */
+  .st-red   { color: #c0392b; }
+  .st-amber { color: #d97706; }
+  .st-green { color: #16a34a; }
+  .st-none  { color: #999; font-weight: 400; }
+
+  /* ── Footer ── */
+  .tbl-footer { margin-top: 10pt; font-size: 7.5pt; color: #aaa; text-align: right; }
+</style>
+</head>
+<body>
+${paintersHtml}
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { alert('Permite ventanas emergentes para imprimir.'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
   },
 
   // ── Helpers ───────────────────────────────────────────────
@@ -321,6 +471,11 @@ const Cronograma = {
   _fmtShort(d) {
     const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     return `${d.getDate()} ${months[d.getMonth()]}`;
+  },
+
+  _fmtLong(d) {
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
   },
 
   _toInputVal(d) {
