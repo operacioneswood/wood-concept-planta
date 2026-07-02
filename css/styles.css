@@ -1305,12 +1305,12 @@ body {
   font-size: 0.82rem;
   background: var(--card);
 }
-.cron-tbl-wide { min-width: 780px; }
+.cron-tbl-wide { min-width: 900px; }
 .cron-tbl th {
   padding: 7px 12px;
   text-align: left;
-  font-weight: 600;
-  color: var(--faint);
+  font-weight: 700;
+  color: #222;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;

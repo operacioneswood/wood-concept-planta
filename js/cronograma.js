@@ -244,9 +244,16 @@ const Cronograma = {
             <td>
               <input type="date" class="cron-date-inp"
                 data-opid="${esc(op.id)}"
+                data-fieldkey="finPintura"
+                value="${this._toInputVal(op.finPintura)}"
+                title="Fin Pintura">
+            </td>
+            <td>
+              <input type="date" class="cron-date-inp"
+                data-opid="${esc(op.id)}"
                 data-fieldkey="salidaFabrica"
                 value="${this._toInputVal(op.salidaFabrica)}"
-                title="Fecha Entrega">
+                title="Fecha Entrega (límite)">
             </td>
             <td>
               <input type="text" class="cron-text-inp"
@@ -275,6 +282,7 @@ const Cronograma = {
               <th>No. OP</th>
               <th>Descripción</th>
               <th>Inicio Pintura</th>
+              <th>Fin Pintura</th>
               <th>Fecha Entrega</th>
               <th>Acabado</th>
               <th>Estado</th>
@@ -324,6 +332,7 @@ const Cronograma = {
           <td class="td-op">${esc(op.noOp || '—')}</td>
           <td class="td-desc">${esc(op.name)}</td>
           <td class="td-date">${op.inicioPintura ? this._fmtLong(op.inicioPintura) : ''}</td>
+          <td class="td-date td-fin">${op.finPintura ? this._fmtLong(op.finPintura) : ''}</td>
           <td class="td-date">${op.salidaFabrica ? this._fmtLong(op.salidaFabrica) : ''}</td>
           <td class="td-aca">${esc(op.acabado || '')}</td>
           <td class="td-est ${stClass}">${st.label}</td>
@@ -345,6 +354,7 @@ const Cronograma = {
                 <th class="td-op">No. OP</th>
                 <th class="td-desc">Descripción</th>
                 <th class="td-date">Inicio Pintura</th>
+                <th class="td-date td-fin">Fin Pintura</th>
                 <th class="td-date">Fecha Entrega</th>
                 <th class="td-aca">Acabado</th>
                 <th class="td-est">Estado</th>
@@ -405,13 +415,14 @@ const Cronograma = {
   tbody tr:nth-child(even) { background: #faf8f6; }
 
   /* ── Column widths ── */
-  .td-num  { width: 22pt;  text-align: center; color: #888; font-size: 8pt; }
-  .td-proj { width: 120pt; font-size: 8.5pt; color: #444; }
-  .td-op   { width: 56pt;  font-weight: 700; color: #8B1A1A; white-space: nowrap; }
+  .td-num  { width: 20pt;  text-align: center; color: #888; font-size: 8pt; }
+  .td-proj { width: 110pt; font-size: 8.5pt; color: #444; }
+  .td-op   { width: 52pt;  font-weight: 700; color: #8B1A1A; white-space: nowrap; }
   .td-desc { }
-  .td-date { width: 68pt;  white-space: nowrap; font-size: 8.5pt; }
-  .td-aca  { width: 72pt;  font-size: 8.5pt; }
-  .td-est  { width: 54pt;  font-weight: 700; font-size: 8pt; text-align: center; white-space: nowrap; }
+  .td-date { width: 62pt;  white-space: nowrap; font-size: 8.5pt; }
+  .td-fin  { background: #fffbf2; }           /* highlight — painter fills this in */
+  .td-aca  { width: 68pt;  font-size: 8.5pt; }
+  .td-est  { width: 50pt;  font-weight: 700; font-size: 8pt; text-align: center; white-space: nowrap; }
 
   /* ── Status colors ── */
   .st-red   { color: #c0392b; }
