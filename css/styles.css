@@ -1328,7 +1328,7 @@ body {
 
 .cron-op-num    { font-weight: 700; font-size: 0.8rem; color: var(--accent); }
 .cron-name      { max-width: 240px; }
-.cron-proyecto  { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+.cron-proyecto  { color: #111; font-size: 0.78rem; white-space: nowrap; }
 .cron-recibido  { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
 .cron-comentario{ color: var(--muted); font-size: 0.78rem; max-width: 200px; }
 .cron-fecha-lbl { font-weight: 600; font-size: 0.8rem; white-space: nowrap; }

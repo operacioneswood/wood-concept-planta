@@ -332,7 +332,7 @@ const Cronograma = {
           <td class="td-op">${esc(op.noOp || '—')}</td>
           <td class="td-desc">${esc(op.name)}</td>
           <td class="td-date">${op.inicioPintura ? this._fmtLong(op.inicioPintura) : ''}</td>
-          <td class="td-date td-fin">${op.finPintura ? this._fmtLong(op.finPintura) : ''}</td>
+          <td class="td-date td-fin"></td>
           <td class="td-date">${op.salidaFabrica ? this._fmtLong(op.salidaFabrica) : ''}</td>
           <td class="td-aca">${esc(op.acabado || '')}</td>
           <td class="td-est ${stClass}">${st.label}</td>
@@ -416,11 +416,12 @@ const Cronograma = {
 
   /* ── Column widths ── */
   .td-num  { width: 20pt;  text-align: center; color: #888; font-size: 8pt; }
-  .td-proj { width: 110pt; font-size: 8.5pt; color: #444; }
+  .td-proj { width: 110pt; font-size: 8.5pt; color: #111; }
   .td-op   { width: 52pt;  font-weight: 700; color: #8B1A1A; white-space: nowrap; }
-  .td-desc { }
+  .td-desc { color: #111; }
   .td-date { width: 62pt;  white-space: nowrap; font-size: 8.5pt; }
-  .td-fin  { background: #fffbf2; }           /* highlight — painter fills this in */
+  .td-fin  { background: #fffdf0; position: relative; }
+  .td-fin::after { content: ''; display: block; border-bottom: 1pt solid #bbb; margin-top: 4pt; }
   .td-aca  { width: 68pt;  font-size: 8.5pt; }
   .td-est  { width: 50pt;  font-weight: 700; font-size: 8pt; text-align: center; white-space: nowrap; }
 
