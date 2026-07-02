@@ -339,9 +339,8 @@ const Cronograma = {
         </tr>`;
       }).join('');
 
-      const pageBreak = pi > 0 ? 'page-break-before:always;' : '';
       return `
-        <div class="painter-page" style="${pageBreak}">
+        <div class="painter-page">
           <div class="painter-hdr">
             <div class="painter-title">Cronograma de Pintura — ${esc(painter)}</div>
             <div class="painter-date">${todayFmt}</div>
@@ -420,8 +419,9 @@ const Cronograma = {
   .td-op   { width: 52pt;  font-weight: 700; color: #8B1A1A; white-space: nowrap; }
   .td-desc { color: #111; }
   .td-date { width: 62pt;  white-space: nowrap; font-size: 8.5pt; }
-  .td-fin  { background: #fffdf0; position: relative; }
-  .td-fin::after { content: ''; display: block; border-bottom: 1pt solid #bbb; margin-top: 4pt; }
+  .td-fin  { background: #fffdf0; }
+  .painter-page + .painter-page { page-break-before: always; }
+  .painter-page:last-child { page-break-after: avoid; }
   .td-aca  { width: 68pt;  font-size: 8.5pt; }
   .td-est  { width: 50pt;  font-weight: 700; font-size: 8pt; text-align: center; white-space: nowrap; }
 
