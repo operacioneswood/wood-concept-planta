@@ -324,8 +324,6 @@ const Cronograma = {
       });
 
       const rows = ops.map((op, idx) => {
-        const st = this._statusInfo(op.salidaFabrica);
-        const stClass = st.cls === 'cron-red' ? 'st-red' : st.cls === 'cron-amber' ? 'st-amber' : st.cls === 'cron-green' ? 'st-green' : 'st-none';
         return `<tr>
           <td class="td-num">${idx + 1}</td>
           <td class="td-proj">${esc(op.project || '—')}</td>
@@ -335,7 +333,6 @@ const Cronograma = {
           <td class="td-date td-fin"></td>
           <td class="td-date">${op.salidaFabrica ? this._fmtLong(op.salidaFabrica) : ''}</td>
           <td class="td-aca">${esc(op.acabado || '')}</td>
-          <td class="td-est ${stClass}">${st.label}</td>
         </tr>`;
       }).join('');
 
@@ -356,7 +353,6 @@ const Cronograma = {
                 <th class="td-date td-fin">Fin Pintura</th>
                 <th class="td-date">Fecha Entrega</th>
                 <th class="td-aca">Acabado</th>
-                <th class="td-est">Estado</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -374,7 +370,7 @@ const Cronograma = {
 <style>
   @page { size: letter portrait; margin: 0.65in 0.75in; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 9.5pt; color: #111; background: #fff; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; color: #111; background: #fff; }
 
   .painter-page { width: 100%; }
 
@@ -387,14 +383,14 @@ const Cronograma = {
     padding-bottom: 8pt;
     margin-bottom: 12pt;
   }
-  .painter-title { font-size: 14pt; font-weight: 700; color: #8B1A1A; letter-spacing: -0.02em; }
-  .painter-date  { font-size: 8.5pt; color: #666; }
+  .painter-title { font-size: 15pt; font-weight: 700; color: #8B1A1A; letter-spacing: -0.02em; }
+  .painter-date  { font-size: 9.5pt; color: #666; }
 
   /* ── Table ── */
-  table { width: 100%; border-collapse: collapse; }
+  table { width: 100%; border-collapse: collapse; orphans: 3; widows: 3; }
   thead tr { background: #f4eeea; }
   th {
-    font-size: 7.5pt;
+    font-size: 9pt;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -405,34 +401,27 @@ const Cronograma = {
     white-space: nowrap;
   }
   td {
-    padding: 5.5pt 7pt;
+    padding: 6.5pt 7pt;
     border-bottom: 0.5pt solid #e8e0db;
     vertical-align: middle;
-    line-height: 1.3;
+    line-height: 1.35;
   }
   tr:last-child td { border-bottom: none; }
   tbody tr:nth-child(even) { background: #faf8f6; }
 
   /* ── Column widths ── */
-  .td-num  { width: 20pt;  text-align: center; color: #888; font-size: 8pt; }
-  .td-proj { width: 110pt; font-size: 8.5pt; color: #111; }
-  .td-op   { width: 52pt;  font-weight: 700; color: #8B1A1A; white-space: nowrap; }
+  .td-num  { width: 18pt;  text-align: center; color: #888; font-size: 9.5pt; }
+  .td-proj { width: 115pt; font-size: 10pt; color: #111; }
+  .td-op   { width: 58pt;  font-weight: 700; color: #8B1A1A; white-space: nowrap; }
   .td-desc { color: #111; }
-  .td-date { width: 62pt;  white-space: nowrap; font-size: 8.5pt; }
+  .td-date { width: 70pt;  white-space: nowrap; font-size: 10pt; }
   .td-fin  { background: #fffdf0; }
   .painter-page + .painter-page { page-break-before: always; }
   .painter-page:last-child { page-break-after: avoid; }
-  .td-aca  { width: 68pt;  font-size: 8.5pt; }
-  .td-est  { width: 50pt;  font-weight: 700; font-size: 8pt; text-align: center; white-space: nowrap; }
-
-  /* ── Status colors ── */
-  .st-red   { color: #c0392b; }
-  .st-amber { color: #d97706; }
-  .st-green { color: #16a34a; }
-  .st-none  { color: #999; font-weight: 400; }
+  .td-aca  { width: 82pt;  font-size: 10pt; }
 
   /* ── Footer ── */
-  .tbl-footer { margin-top: 10pt; font-size: 7.5pt; color: #aaa; text-align: right; }
+  .tbl-footer { margin-top: 10pt; font-size: 8.5pt; color: #aaa; text-align: right; }
 </style>
 </head>
 <body>
