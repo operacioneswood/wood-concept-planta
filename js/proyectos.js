@@ -150,6 +150,18 @@ const Proyectos = {
           </div>
         ` : ''}
 
+        ${(() => {
+          const opPartes = (App._dbData?.partes || []).filter(p => p.op_id === op.id);
+          if (!opPartes.length) return '';
+          const fmtP = iso => { if (!iso) return ''; const d = new Date(iso+'T12:00:00'); const M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']; return `${d.getDate()} ${M[d.getMonth()]}`; };
+          const active = opPartes.filter(p => !p.fecha_fin);
+          const done   = opPartes.filter(p => !!p.fecha_fin);
+          return `<div class="proj-partes-row">
+            ${active.map(p => `<span class="proj-parte-tag"><span class="proj-parte-nombre">${esc(p.nombre)}</span><span class="proj-parte-quien">${esc(p.persona)}</span><span class="proj-parte-fecha">${fmtP(p.fecha_inicio)}</span></span>`).join('')}
+            ${done.map(p => { const days=p.fecha_inicio&&p.fecha_fin?Math.round((new Date(p.fecha_fin)-new Date(p.fecha_inicio))/86400000):null; return `<span class="proj-parte-tag proj-parte-done"><span class="proj-parte-nombre">${esc(p.nombre)}</span><span class="proj-parte-quien">${esc(p.persona)}</span><span class="proj-parte-fecha">${fmtP(p.fecha_inicio)}→${fmtP(p.fecha_fin)}${days!==null?` (${days}d)`:''}</span></span>`; }).join('')}
+          </div>`;
+        })()}
+
         <div class="proj-card-footer">
           <button class="btn-contratista ${ct ? 'active' : ''}" data-op="${esc(op.id)}">
             ${ct ? '🔧 ' + esc(ct.name || 'Contratista') : '+ Contratista'}

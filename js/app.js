@@ -49,7 +49,7 @@ const App = {
     this._setupTiemposModal();
 
     // Load Supabase data in parallel with ClickUp cache render
-    this._dbData = { asignaciones: [], prioridades: [], produccion: [], personas: [] };
+    this._dbData = { asignaciones: [], prioridades: [], produccion: [], personas: [], partes: [] };
     const [cached] = await Promise.allSettled([
       this._loadDbData(),
     ]);
@@ -73,7 +73,7 @@ const App = {
 
   async _loadDbData() {
     try {
-      const [asignaciones, prioridades, produccion, personas, historial, tiempos, planos] = await Promise.all([
+      const [asignaciones, prioridades, produccion, personas, historial, tiempos, planos, partes] = await Promise.all([
         DB.getAsignaciones(),
         DB.getPrioridades(),
         DB.getProduccion(),
@@ -81,6 +81,7 @@ const App = {
         DB.getHistorial(),
         DB.getAllTiempos(),
         DB.getPlanos(),
+        DB.getPartes(),
       ]);
       this._dbData = {
         asignaciones: asignaciones || [],
@@ -90,6 +91,7 @@ const App = {
         historial:    historial    || [],
         tiempos:      tiempos      || [],
         planos:       planos       || [],
+        partes:       partes       || [],
       };
     } catch (e) {
       console.error('[App] DB load failed:', e.message);

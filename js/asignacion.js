@@ -110,11 +110,32 @@ const Asignacion = {
     const chips = opAssigns.map(a => {
       const subsList   = (a.subprocesos || '').split(',').filter(Boolean);
       const subsLabels = subsList.map(id => subproLabel(id));
+
+      const chipPartes = (App._dbData?.partes || [])
+        .filter(p => p.op_id === op.id && p.persona === a.person);
+      const activeParts = chipPartes.filter(p => !p.fecha_fin);
+      const doneParts   = chipPartes.filter(p => !!p.fecha_fin);
+      const fmtP = iso => {
+        if (!iso) return '';
+        const d = new Date(iso + 'T12:00:00');
+        const M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+        return `${d.getDate()} ${M[d.getMonth()]}`;
+      };
+      const partesHtml = chipPartes.length ? `
+        <div class="chip-partes">
+          ${activeParts.map(p => `<span class="chip-parte-tag">${esc(p.nombre)} <span class="chip-parte-fecha">${fmtP(p.fecha_inicio)}</span></span>`).join('')}
+          ${doneParts.map(p => {
+            const days = p.fecha_inicio && p.fecha_fin ? Math.round((new Date(p.fecha_fin)-new Date(p.fecha_inicio))/86400000) : null;
+            return `<span class="chip-parte-tag chip-parte-done">${esc(p.nombre)} <span class="chip-parte-fecha">${fmtP(p.fecha_inicio)}→${fmtP(p.fecha_fin)}${days!==null?` (${days}d)`:''}</span></span>`;
+          }).join('')}
+        </div>` : '';
+
       return `
         <div class="asign-chip" data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">
           <span class="chip-name">${esc(a.person)}</span>
           ${a.stage && a.stage !== '_' ? `<span class="chip-stage">${esc(STAGE_LABELS[a.stage] || a.stage)}</span>` : ''}
           ${subsLabels.length ? `<span class="chip-subs">${subsLabels.map(esc).join(', ')}</span>` : ''}
+          ${partesHtml}
           <input type="text" class="chip-comment"
             data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}"
             value="${esc(a.comentario || '')}" placeholder="Qué hizo...">

@@ -57,6 +57,7 @@ const Panel = {
 
     this._bindMove();
     this._bindActions();
+    this._bindPartes();
   },
 
   _renderSection(title, people, assignments) {
@@ -161,6 +162,7 @@ const Panel = {
           ${assignDateFmt ? `<span class="panel-assign-date">Asig. ${assignDateFmt}</span>` : ''}
           ${this._planosMap[op.id] ? `<span class="panel-plano-lbl">📐 ${esc(this._planosMap[op.id])}</span>` : ''}
           ${pills}
+          ${this._renderPartes(op.id, name, stageInfos)}
           <div class="panel-task-actions">
             ${finBtns}
             ${cerrarBtns}
@@ -181,6 +183,148 @@ const Panel = {
         </div>
       </div>
     `;
+  },
+
+  // ── Partes (sub-components) ───────────────────────────────
+
+  _fmtParte(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T12:00:00');
+    const M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `${d.getDate()} ${M[d.getMonth()]}`;
+  },
+
+  _renderPartes(opId, persona, stageInfos) {
+    const partes  = (App._dbData?.partes || []).filter(p => p.op_id === opId && p.persona === persona);
+    const stage   = stageInfos.find(s => s.stageId)?.stageId || '_';
+    const active  = partes.filter(p => !p.fecha_fin);
+    const done    = partes.filter(p => !!p.fecha_fin);
+
+    const activeRows = active.map(p => `
+      <span class="parte-tag" data-id="${esc(p.id)}">
+        <span class="parte-tag-nombre">${esc(p.nombre)}</span>
+        <span class="parte-tag-fecha">${this._fmtParte(p.fecha_inicio)}</span>
+        <button class="btn-fin-parte" data-id="${esc(p.id)}" title="Marcar fin hoy">✓ Fin</button>
+        <button class="btn-del-parte" data-id="${esc(p.id)}" title="Eliminar">✕</button>
+      </span>`).join('');
+
+    const doneRows = done.map(p => {
+      const days = p.fecha_inicio && p.fecha_fin
+        ? Math.round((new Date(p.fecha_fin) - new Date(p.fecha_inicio)) / 86400000)
+        : null;
+      return `
+        <span class="parte-tag parte-tag-done" data-id="${esc(p.id)}">
+          <span class="parte-tag-nombre">${esc(p.nombre)}</span>
+          <span class="parte-tag-fecha">${this._fmtParte(p.fecha_inicio)} → ${this._fmtParte(p.fecha_fin)}${days !== null ? ` (${days}d)` : ''}</span>
+          <button class="btn-del-parte" data-id="${esc(p.id)}" title="Eliminar">✕</button>
+        </span>`;
+    }).join('');
+
+    const opts = PARTES_PREDEFINIDAS.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('') +
+      `<option value="_otro">Otro...</option>`;
+
+    return `
+      <div class="partes-section" data-opid="${esc(opId)}" data-persona="${esc(persona)}" data-stage="${esc(stage)}">
+        ${active.length || done.length ? `<div class="partes-list">${activeRows}${doneRows}</div>` : ''}
+        <div class="partes-add-form" style="display:none">
+          <select class="parte-sel">${opts}</select>
+          <input class="parte-custom-inp" type="text" placeholder="Nombre..." style="display:none">
+          <input class="parte-fecha-inp" type="date" value="${todayIso()}">
+          <button class="btn-save-parte btn-primary btn-sm">✓</button>
+          <button class="btn-cancel-parte btn-sm">✕</button>
+        </div>
+        <button class="btn-add-parte">+ Parte</button>
+      </div>`;
+  },
+
+  _bindPartes() {
+    const root = document.getElementById('panel-body');
+    if (!root) return;
+
+    root.querySelectorAll('.btn-add-parte').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const form = btn.closest('.partes-section').querySelector('.partes-add-form');
+        const showing = form.style.display !== 'none';
+        form.style.display = showing ? 'none' : 'flex';
+        btn.style.display  = showing ? '' : 'none';
+      });
+    });
+
+    root.querySelectorAll('.parte-sel').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const form   = sel.closest('.partes-add-form');
+        const custom = form.querySelector('.parte-custom-inp');
+        custom.style.display = sel.value === '_otro' ? '' : 'none';
+        if (sel.value === '_otro') custom.focus();
+      });
+    });
+
+    root.querySelectorAll('.btn-cancel-parte').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const section = btn.closest('.partes-section');
+        section.querySelector('.partes-add-form').style.display = 'none';
+        section.querySelector('.btn-add-parte').style.display   = '';
+      });
+    });
+
+    root.querySelectorAll('.btn-save-parte').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const form    = btn.closest('.partes-add-form');
+        const section = form.closest('.partes-section');
+        const sel     = form.querySelector('.parte-sel');
+        const custom  = form.querySelector('.parte-custom-inp');
+        const fecha   = form.querySelector('.parte-fecha-inp');
+        const nombre  = sel.value === '_otro' ? custom.value.trim() : sel.value;
+        if (!nombre) { custom.focus(); return; }
+
+        const orig = btn.textContent; btn.textContent = '...'; btn.disabled = true;
+        try {
+          const row = await DB.addParte({
+            op_id:        section.dataset.opid,
+            etapa:        section.dataset.stage,
+            persona:      section.dataset.persona,
+            nombre,
+            fecha_inicio: fecha.value || todayIso(),
+          });
+          App._dbData.partes = App._dbData.partes || [];
+          App._dbData.partes.push(row);
+          App.renderPanel();
+        } catch (e) {
+          alert('Error al guardar parte: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
+
+    root.querySelectorAll('.btn-fin-parte').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id   = btn.dataset.id;
+        const orig = btn.textContent; btn.textContent = '...'; btn.disabled = true;
+        try {
+          const today = todayIso();
+          await DB.finParte(id, today);
+          const p = (App._dbData.partes || []).find(p => p.id === id);
+          if (p) p.fecha_fin = today;
+          App.renderPanel();
+        } catch (e) {
+          alert('Error: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
+
+    root.querySelectorAll('.btn-del-parte').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('¿Eliminar esta parte?')) return;
+        try {
+          await DB.deleteParte(btn.dataset.id);
+          App._dbData.partes = (App._dbData.partes || []).filter(p => p.id !== btn.dataset.id);
+          App.renderPanel();
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
+      });
+    });
   },
 
   // ── Order persistence ─────────────────────────────────────

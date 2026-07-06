@@ -165,6 +165,29 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
+  // PARTES_OP  (sub-components within an assignment)
+  // ════════════════════════════════════════════════════════
+  async getPartes() {
+    return this._q(sb => sb.from('partes_op').select('*').order('created_at'));
+  },
+
+  async addParte({ op_id, etapa, persona, nombre, fecha_inicio = null, notas = null }) {
+    return this._q(sb => sb.from('partes_op')
+      .insert({ op_id, etapa, persona, nombre, fecha_inicio, notas })
+      .select().single());
+  },
+
+  async finParte(id, fecha_fin) {
+    return this._q(sb => sb.from('partes_op')
+      .update({ fecha_fin }).eq('id', id).select().single());
+  },
+
+  async deleteParte(id) {
+    const { error } = await this._sb.from('partes_op').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // ════════════════════════════════════════════════════════
   // SETUP — create tables if they don't exist (run once)
   // ════════════════════════════════════════════════════════
   async setupTables() {

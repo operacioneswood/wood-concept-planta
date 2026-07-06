@@ -537,6 +537,22 @@ body {
 .repro-lbl { color: var(--amber); font-weight: 600; }
 .repro-causa { color: var(--muted); }
 
+/* ── Partes en Proyectos ─────────────────────────────────── */
+.proj-partes-row {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin: 8px 0 4px; padding: 6px 0 4px;
+  border-top: 1px solid var(--divider);
+}
+.proj-parte-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--surface-2, var(--surface)); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 8px; font-size: 11px;
+}
+.proj-parte-done { opacity: 0.55; }
+.proj-parte-nombre { font-weight: 600; color: var(--text); }
+.proj-parte-quien { color: var(--accent); font-size: 10px; }
+.proj-parte-fecha { color: var(--muted); font-size: 10px; }
+
 .proj-card-footer { margin-top: 10px; }
 .btn-contratista {
   background: none; border: 1px dashed var(--border);
@@ -708,6 +724,19 @@ body {
   font-size: 10px; color: var(--muted); background: var(--surface);
   border-radius: 4px; padding: 1px 6px; white-space: nowrap;
 }
+
+/* ── Partes en chips de Asignación ───────────────────────── */
+.chip-partes {
+  display: flex; flex-wrap: wrap; gap: 4px; width: 100%;
+  margin-top: 4px;
+}
+.chip-parte-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 5px; padding: 2px 6px; font-size: 10px;
+}
+.chip-parte-done { opacity: 0.55; }
+.chip-parte-fecha { color: var(--muted); }
 
 /* Sub-process checkboxes */
 .asign-subprocesos {
@@ -1113,6 +1142,50 @@ body {
 /* ════════════════════════════════════════════════════════════
    PANEL ACTION BUTTONS (Fin / Cerrar per task row)
    ════════════════════════════════════════════════════════════ */
+/* ── Partes en Panel ─────────────────────────────────────── */
+.partes-section {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  width: 100%; margin: 3px 0;
+}
+.partes-list { display: flex; flex-wrap: wrap; gap: 4px; }
+.parte-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 2px 7px; font-size: 11px;
+  white-space: nowrap;
+}
+.parte-tag-done { opacity: 0.5; }
+.parte-tag-nombre { font-weight: 600; color: var(--text); }
+.parte-tag-fecha  { color: var(--muted); font-size: 10px; }
+.btn-fin-parte {
+  font-size: 10px; padding: 1px 5px; border-radius: 4px; cursor: pointer;
+  background: var(--green-bg, #f0fdf4); color: var(--green, #16a34a);
+  border: 1px solid var(--green-border, #bbf7d0); white-space: nowrap;
+}
+.btn-fin-parte:hover { background: var(--green, #16a34a); color: #fff; }
+.btn-del-parte {
+  font-size: 10px; padding: 0 3px; cursor: pointer; color: var(--muted);
+  background: none; border: none; line-height: 1;
+}
+.btn-del-parte:hover { color: var(--red); }
+.btn-add-parte {
+  font-size: 11px; padding: 2px 8px; border-radius: 5px; cursor: pointer;
+  border: 1px dashed var(--border); color: var(--muted); background: none;
+  white-space: nowrap;
+}
+.btn-add-parte:hover { border-color: var(--accent); color: var(--accent); }
+.partes-add-form {
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+  margin-top: 2px; width: 100%;
+}
+.parte-sel, .parte-custom-inp, .parte-fecha-inp {
+  font-size: 11px; padding: 3px 6px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+}
+.parte-sel { max-width: 140px; }
+.parte-custom-inp { width: 120px; }
+.parte-fecha-inp { width: 130px; }
+
 .panel-task-actions { display: flex; gap: 4px; margin-left: auto; flex-shrink: 0; }
 .panel-btn-fin {
   font-size: 11px; padding: 2px 7px; border-radius: 5px; cursor: pointer;

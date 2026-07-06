@@ -166,3 +166,9 @@ function subproLabel(id) {
   }
   return id;
 }
+
+// Predefined part names for the hybrid dropdown
+const PARTES_PREDEFINIDAS = [
+  'Puerta(s)', 'Panel', 'Panelado', 'Mueble', 'Gaveta(s)',
+  'Revestimiento', 'Estructura', 'Cubierta', 'Marco', 'Tapa', 'Cajonería',
+];
