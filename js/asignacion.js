@@ -111,8 +111,7 @@ const Asignacion = {
       const subsList   = (a.subprocesos || '').split(',').filter(Boolean);
       const subsLabels = subsList.map(id => subproLabel(id));
 
-      const chipPartes = (App._dbData?.partes || [])
-        .filter(p => p.op_id === op.id && p.persona === a.person);
+      const chipPartes  = (App._dbData?.partes || []).filter(p => p.op_id === op.id && p.persona === a.person);
       const activeParts = chipPartes.filter(p => !p.fecha_fin);
       const doneParts   = chipPartes.filter(p => !!p.fecha_fin);
       const fmtP = iso => {
@@ -121,26 +120,47 @@ const Asignacion = {
         const M = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
         return `${d.getDate()} ${M[d.getMonth()]}`;
       };
-      const partesHtml = chipPartes.length ? `
-        <div class="chip-partes">
-          ${activeParts.map(p => `<span class="chip-parte-tag">${esc(p.nombre)} <span class="chip-parte-fecha">${fmtP(p.fecha_inicio)}</span></span>`).join('')}
-          ${doneParts.map(p => {
-            const days = p.fecha_inicio && p.fecha_fin ? Math.round((new Date(p.fecha_fin)-new Date(p.fecha_inicio))/86400000) : null;
-            return `<span class="chip-parte-tag chip-parte-done">${esc(p.nombre)} <span class="chip-parte-fecha">${fmtP(p.fecha_inicio)}→${fmtP(p.fecha_fin)}${days!==null?` (${days}d)`:''}</span></span>`;
-          }).join('')}
-        </div>` : '';
+      const chipStage = a.stage || '_';
+      const activeRows = activeParts.map(p => `
+        <span class="chip-parte-tag" data-id="${esc(p.id)}">
+          <span class="chip-parte-nombre">${esc(p.nombre)}</span>
+          <span class="chip-parte-fecha">${fmtP(p.fecha_inicio)}</span>
+          <button class="btn-chip-fin-parte" data-id="${esc(p.id)}">✓ Fin</button>
+          <button class="btn-chip-del-parte" data-id="${esc(p.id)}">✕</button>
+        </span>`).join('');
+      const doneRows = doneParts.map(p => {
+        const days = p.fecha_inicio && p.fecha_fin ? Math.round((new Date(p.fecha_fin)-new Date(p.fecha_inicio))/86400000) : null;
+        return `<span class="chip-parte-tag chip-parte-done">
+          <span class="chip-parte-nombre">${esc(p.nombre)}</span>
+          <span class="chip-parte-fecha">${fmtP(p.fecha_inicio)}→${fmtP(p.fecha_fin)}${days!==null?` (${days}d)`:''}</span>
+          <button class="btn-chip-del-parte" data-id="${esc(p.id)}">✕</button>
+        </span>`;
+      }).join('');
+      const parteOpts = PARTES_PREDEFINIDAS.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('') +
+        `<option value="_otro">Otro...</option>`;
 
       return `
         <div class="asign-chip" data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">
           <span class="chip-name">${esc(a.person)}</span>
           ${a.stage && a.stage !== '_' ? `<span class="chip-stage">${esc(STAGE_LABELS[a.stage] || a.stage)}</span>` : ''}
           ${subsLabels.length ? `<span class="chip-subs">${subsLabels.map(esc).join(', ')}</span>` : ''}
-          ${partesHtml}
+          ${chipPartes.length ? `<div class="chip-partes">${activeRows}${doneRows}</div>` : ''}
+          <div class="chip-partes-add-form" style="display:none"
+               data-opid="${esc(op.id)}" data-persona="${esc(a.person)}" data-stage="${esc(chipStage)}">
+            <select class="chip-parte-sel">${parteOpts}</select>
+            <input class="chip-parte-custom" type="text" placeholder="Nombre..." style="display:none">
+            <input class="chip-parte-fecha-inp" type="date" value="${todayIso()}">
+            <button class="btn-chip-save-parte btn-primary btn-sm">✓</button>
+            <button class="btn-chip-cancel-parte btn-sm">✕</button>
+          </div>
           <input type="text" class="chip-comment"
             data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}"
             value="${esc(a.comentario || '')}" placeholder="Qué hizo...">
-          <button class="btn-chip-fin"    data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">■ Fin</button>
-          <button class="btn-chip-remove" data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">✕</button>
+          <div class="chip-footer-row">
+            <button class="btn-add-chip-parte">+ Parte</button>
+            <button class="btn-chip-fin"    data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">■ Fin</button>
+            <button class="btn-chip-remove" data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">✕</button>
+          </div>
         </div>
       `;
     }).join('');
@@ -503,6 +523,93 @@ const Asignacion = {
           btn.textContent = orig;
         }
         btn.disabled = false;
+      });
+    });
+
+    // ── Partes desde Asignación ───────────────────────────────
+
+    document.querySelectorAll('.btn-add-chip-parte').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const chip = btn.closest('.asign-chip');
+        const form = chip.querySelector('.chip-partes-add-form');
+        const showing = form.style.display !== 'none';
+        form.style.display = showing ? 'none' : 'flex';
+      });
+    });
+
+    document.querySelectorAll('.chip-parte-sel').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const form   = sel.closest('.chip-partes-add-form');
+        const custom = form.querySelector('.chip-parte-custom');
+        custom.style.display = sel.value === '_otro' ? '' : 'none';
+        if (sel.value === '_otro') custom.focus();
+      });
+    });
+
+    document.querySelectorAll('.btn-chip-cancel-parte').forEach(btn => {
+      btn.addEventListener('click', () => {
+        btn.closest('.chip-partes-add-form').style.display = 'none';
+      });
+    });
+
+    document.querySelectorAll('.btn-chip-save-parte').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const form   = btn.closest('.chip-partes-add-form');
+        const sel    = form.querySelector('.chip-parte-sel');
+        const custom = form.querySelector('.chip-parte-custom');
+        const fecha  = form.querySelector('.chip-parte-fecha-inp');
+        const nombre = sel.value === '_otro' ? custom.value.trim() : sel.value;
+        if (!nombre) { (sel.value === '_otro' ? custom : sel).focus(); return; }
+
+        const orig = btn.textContent; btn.textContent = '...'; btn.disabled = true;
+        try {
+          const row = await DB.addParte({
+            op_id:        form.dataset.opid,
+            etapa:        form.dataset.stage,
+            persona:      form.dataset.persona,
+            nombre,
+            fecha_inicio: fecha.value || todayIso(),
+          });
+          App._dbData.partes = App._dbData.partes || [];
+          App._dbData.partes.push(row);
+          App.renderPanel();
+          rerender();
+        } catch (e) {
+          alert('Error al guardar parte: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-chip-fin-parte').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id   = btn.dataset.id;
+        const orig = btn.textContent; btn.textContent = '...'; btn.disabled = true;
+        try {
+          const today = todayIso();
+          await DB.finParte(id, today);
+          const p = (App._dbData.partes || []).find(p => p.id === id);
+          if (p) p.fecha_fin = today;
+          App.renderPanel();
+          rerender();
+        } catch (e) {
+          alert('Error: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-chip-del-parte').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('¿Eliminar esta parte?')) return;
+        try {
+          await DB.deleteParte(btn.dataset.id);
+          App._dbData.partes = (App._dbData.partes || []).filter(p => p.id !== btn.dataset.id);
+          App.renderPanel();
+          rerender();
+        } catch (e) {
+          alert('Error: ' + e.message);
+        }
       });
     });
   },
