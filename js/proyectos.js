@@ -32,12 +32,15 @@ const Proyectos = {
     if (!ops.length) {
       body.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><p>Sin OPs activos en planta.</p></div>';
     } else {
-      const groups = this._groupByProject(ops);
+      const groups    = this._groupByProject(ops);
+      const allPartes = dbData?.partes || [];
+      const partesAvg = this._calcPartesAverages(allPartes);
       body.innerHTML = `
         <div class="asign-search-wrap">
           <input type="search" id="proy-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre...">
         </div>
         ${Object.keys(avgMap).length ? this._renderAverages(avgMap, ops) : ''}
+        ${Object.keys(partesAvg).length ? this._renderPartesAverages(partesAvg, ops) : ''}
         ${[...groups.entries()].map(([proj, projOps]) =>
           this._renderGroup(proj, projOps, contratistas, tiemposMap)
         ).join('')}
@@ -246,6 +249,59 @@ const Proyectos = {
     return `
       <div class="promedios-strip">
         <div class="promedios-hdr">📊 Tiempos promedio por etapa</div>
+        <div class="promedios-grid">${items.join('')}</div>
+      </div>
+    `;
+  },
+
+  _calcPartesAverages(partes) {
+    const sums = {};
+    for (const p of partes) {
+      if (!p.fecha_inicio || !p.fecha_fin) continue;
+      const days = Math.round((new Date(p.fecha_fin) - new Date(p.fecha_inicio)) / 86400000);
+      if (isNaN(days) || days < 0) continue;
+      if (!sums[p.nombre]) sums[p.nombre] = { total: 0, count: 0, items: [] };
+      sums[p.nombre].total += days;
+      sums[p.nombre].count++;
+      sums[p.nombre].items.push({ op_id: p.op_id, persona: p.persona, days });
+    }
+    const result = {};
+    for (const [nombre, s] of Object.entries(sums)) {
+      s.items.sort((a, b) => b.days - a.days);
+      result[nombre] = { avg: s.total / s.count, count: s.count, items: s.items };
+    }
+    return result;
+  },
+
+  _renderPartesAverages(avgMap, ops) {
+    const noOpMap = {};
+    for (const op of (ops || [])) noOpMap[op.id] = op.noOp || '';
+
+    const items = Object.entries(avgMap)
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([nombre, { avg, count, items }]) => {
+        const avgFmt = Number.isInteger(avg) ? `${avg}d` : `${avg.toFixed(1)}d`;
+        const rows = items.map(it => `
+          <div class="prom-op-row">
+            ${noOpMap[it.op_id] ? `<span class="prom-op-num">${esc(noOpMap[it.op_id])}</span>` : ''}
+            <span class="prom-op-name">${esc(it.persona || '—')}</span>
+            <span class="prom-op-dur">${it.days}d</span>
+          </div>
+        `).join('');
+        return `
+          <div class="prom-item">
+            <span class="prom-etapa">🪵 ${esc(nombre)}</span>
+            <span class="prom-val">${avgFmt}</span>
+            <span class="prom-count">${count} parte${count !== 1 ? 's' : ''}</span>
+            <button class="prom-expand-btn" title="Ver registros individuales">▼ ver</button>
+            <div class="prom-op-list" style="display:none">${rows}</div>
+          </div>
+        `;
+      });
+
+    return `
+      <div class="promedios-strip">
+        <div class="promedios-hdr">🪵 Tiempos promedio por parte</div>
         <div class="promedios-grid">${items.join('')}</div>
       </div>
     `;
