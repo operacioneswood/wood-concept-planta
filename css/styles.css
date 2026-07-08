@@ -1233,6 +1233,14 @@ body {
   white-space: nowrap; line-height: 1.6;
 }
 .panel-btn-fin:hover { background: var(--red); color: #fff; }
+.panel-btn-fin-repro {
+  font-size: 11px; padding: 2px 7px; border-radius: 5px; cursor: pointer;
+  border: 1px solid #fbbf24; background: #fef9c3; color: #713f12;
+  white-space: nowrap; line-height: 1.6; font-weight: 600;
+}
+.panel-btn-fin-repro:hover { background: #fbbf24; color: #fff; }
+.stage-pill-repro { color: #713f12 !important; background: #fef08a; border-radius: 4px; padding: 1px 5px; }
+.tablet .panel-btn-fin-repro { font-size: 13px; padding: 6px 12px; min-height: 38px; border-radius: 8px; }
 .panel-btn-cerrar {
   font-size: 11px; padding: 2px 7px; border-radius: 5px; cursor: pointer;
   border: 1px solid var(--blue-border); background: var(--blue-bg); color: var(--blue);

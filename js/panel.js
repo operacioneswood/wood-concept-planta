@@ -145,6 +145,23 @@ const Panel = {
             data-datekey="${esc(s.finKey)}">✓ Cerrar${stageInfos.length > 1 ? ' ' + esc(s.stageLabel) : ''}</button>
         `).join('');
 
+      // ── Reproceso pill + buttons ────────────────────────────────
+      const hasReproAssign  = personAssigns.some(a => a.stage === 'reproceso');
+      const reproFinFieldId = hasReproAssign ? (this._fieldIds['finReproceso'] || '') : '';
+      const reproOpen       = hasReproAssign && op.inicioReproceso && !op.finReproceso;
+      const reproPill       = hasReproAssign
+        ? `<span class="stage-pill-sm stage-pill-repro">⚠ Reproceso</span>`
+        : '';
+      const reproBtns = hasReproAssign ? `
+        <button class="panel-btn-fin"
+          data-op="${esc(op.id)}" data-person="${esc(name)}" data-stage="reproceso">■ Fin</button>
+        ${reproOpen && reproFinFieldId ? `
+          <button class="panel-btn-fin-repro"
+            data-op="${esc(op.id)}" data-person="${esc(name)}"
+            data-fieldid="${esc(reproFinFieldId)}">✓ Fin Reproceso</button>
+        ` : ''}
+      ` : '';
+
       const isFirst = idx === 0;
       const isLast  = idx === orderedOps.length - 1;
 
@@ -161,11 +178,12 @@ const Panel = {
           <span class="panel-task-name">${esc(op.name)}</span>
           ${assignDateFmt ? `<span class="panel-assign-date">Asig. ${assignDateFmt}</span>` : ''}
           ${this._planosMap[op.id] ? `<span class="panel-plano-lbl">📐 ${esc(this._planosMap[op.id])}</span>` : ''}
-          ${pills}
+          ${pills}${reproPill}
           ${this._renderPartes(op.id, name, stageInfos)}
           <div class="panel-task-actions">
             ${finBtns}
             ${cerrarBtns}
+            ${reproBtns}
           </div>
         </div>
       `;
@@ -405,7 +423,7 @@ const Panel = {
           const histEntry = {
             op_id: opId, etapa: stage, persona: person,
             fecha_inicio: fechaInicio, fecha_fin: today,
-            es_reproceso: false, comentario: '', subprocesos,
+            es_reproceso: stage === 'reproceso', comentario: '', subprocesos,
           };
           App._dbData.historial = (App._dbData.historial || []).filter(
             h => !(h.op_id === opId && h.etapa === stage && h.persona === person)
@@ -417,6 +435,39 @@ const Panel = {
             a => !(a.op_id === opId && a.persona === person && a.etapa === stage)
           );
           DB.removeAsignacion(opId, person, stage).catch(e => console.warn('[Panel] remove:', e.message));
+
+          App.renderPanel();
+          Proyectos.render({ ...App._data, dbData: App._dbData });
+          Asignacion._rerender();
+        } catch (e) {
+          alert('Error: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
+
+    // ✓ Fin Reproceso — sets finReproceso in ClickUp + removes assignment
+    document.querySelectorAll('.panel-btn-fin-repro').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const opId    = btn.dataset.op;
+        const person  = btn.dataset.person;
+        const fieldId = btn.dataset.fieldid;
+
+        if (!confirm('¿Confirmar fin de Reproceso?\nEsto marcará la fecha en ClickUp y eliminará la asignación.')) return;
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+
+        try {
+          await PlantaAPI.setField(opId, fieldId, Date.now());
+          const op = App._data?.ops.find(o => o.id === opId);
+          if (op) op.finReproceso = new Date();
+          PlantaAPI.clearCache();
+
+          App._dbData.asignaciones = App._dbData.asignaciones.filter(
+            a => !(a.op_id === opId && a.persona === person && a.etapa === 'reproceso')
+          );
+          DB.removeAsignacion(opId, person, 'reproceso').catch(e => console.warn('[Panel] repro remove:', e.message));
 
           App.renderPanel();
           Proyectos.render({ ...App._data, dbData: App._dbData });
