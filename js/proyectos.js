@@ -33,14 +33,16 @@ const Proyectos = {
       body.innerHTML = '<div class="empty-state"><div class="empty-icon">📦</div><p>Sin OPs activos en planta.</p></div>';
     } else {
       const groups    = this._groupByProject(ops);
-      const allPartes = dbData?.partes || [];
-      const partesAvg = this._calcPartesAverages(allPartes);
+      const allPartes  = dbData?.partes || [];
+      const partesAvg  = this._calcPartesAverages(allPartes);
+      const reproHtml  = this._renderReprocesos(ops);
       body.innerHTML = `
         <div class="asign-search-wrap">
           <input type="search" id="proy-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre...">
         </div>
         ${Object.keys(avgMap).length ? this._renderAverages(avgMap, ops) : ''}
         ${Object.keys(partesAvg).length ? this._renderPartesAverages(partesAvg, ops) : ''}
+        ${reproHtml}
         ${[...groups.entries()].map(([proj, projOps]) =>
           this._renderGroup(proj, projOps, contratistas, tiemposMap)
         ).join('')}
@@ -250,6 +252,61 @@ const Proyectos = {
       <div class="promedios-strip">
         <div class="promedios-hdr">📊 Tiempos promedio por etapa</div>
         <div class="promedios-grid">${items.join('')}</div>
+      </div>
+    `;
+  },
+
+  _renderReprocesos(ops) {
+    const done = ops
+      .filter(op => op.inicioReproceso && op.finReproceso)
+      .map(op => ({
+        noOp: op.noOp, name: op.name,
+        days: Math.round((op.finReproceso - op.inicioReproceso) / 86400000),
+      }))
+      .filter(r => r.days >= 0)
+      .sort((a, b) => b.days - a.days);
+
+    const active = ops
+      .filter(op => op.inicioReproceso && !op.finReproceso)
+      .map(op => ({
+        noOp: op.noOp, name: op.name,
+        days: Math.round((Date.now() - op.inicioReproceso) / 86400000),
+      }))
+      .sort((a, b) => b.days - a.days);
+
+    if (!done.length && !active.length) return '';
+
+    const avg    = done.length ? done.reduce((s, r) => s + r.days, 0) / done.length : null;
+    const avgFmt = avg !== null ? (avg % 1 === 0 ? `${avg}d` : `${avg.toFixed(1)}d`) : '—';
+    const total  = done.length + active.length;
+
+    const rows = [
+      ...active.map(r => `
+        <div class="prom-op-row">
+          ${r.noOp ? `<span class="prom-op-num">${esc(r.noOp)}</span>` : ''}
+          <span class="prom-op-name">${esc(r.name)}</span>
+          <span class="prom-op-dur" style="color:var(--amber)">⏳ ${r.days}d en curso</span>
+        </div>`),
+      ...done.map(r => `
+        <div class="prom-op-row">
+          ${r.noOp ? `<span class="prom-op-num">${esc(r.noOp)}</span>` : ''}
+          <span class="prom-op-name">${esc(r.name)}</span>
+          <span class="prom-op-dur">✓ ${r.days}d</span>
+        </div>`),
+    ].join('');
+
+    return `
+      <div class="promedios-strip">
+        <div class="promedios-hdr">⚠ Tiempos de reproceso</div>
+        <div class="promedios-grid">
+          <div class="prom-item">
+            <span class="prom-etapa" style="color:#713f12">Reproceso</span>
+            <span class="prom-val">${avgFmt}</span>
+            <span class="prom-count">${total} OP${total !== 1 ? 's' : ''}${active.length ? ` · ${active.length} en curso` : ''}</span>
+            <button class="prom-expand-btn">▼ ver</button>
+            <div class="prom-op-list" style="display:none">${rows}</div>
+          </div>
+        </div>
       </div>
     `;
   },
