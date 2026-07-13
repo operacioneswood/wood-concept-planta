@@ -100,6 +100,7 @@ const Cronograma = {
           <tr>
             <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
             <td class="cron-name">${esc(op.name)}</td>
+            <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
             <td>
               <input type="date" class="cron-date-inp"
                 data-opid="${esc(op.id)}"
@@ -125,6 +126,7 @@ const Cronograma = {
             <thead><tr>
               <th>No. OP</th>
               <th>Descripción</th>
+              <th>Etapa</th>
               <th>Fecha límite</th>
               <th>Fecha</th>
               <th>Estado</th>
@@ -159,7 +161,7 @@ const Cronograma = {
           <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
           <td class="cron-proyecto">${esc(op.project || '—')}</td>
           <td class="cron-name">${esc(op.name)}</td>
-          <td class="cron-etapa-lbl">${esc(op.statusRaw || op.status)}</td>
+          <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
           <td>
             <input type="date" class="cron-date-inp"
               data-opid="${esc(op.id)}"
@@ -456,6 +458,15 @@ ${paintersHtml}
     if (overdue > 0) parts.push(`<span class="cron-urg cron-red">${overdue} vencido${overdue > 1 ? 's' : ''}</span>`);
     if (urgent  > 0) parts.push(`<span class="cron-urg cron-amber">${urgent} urgente${urgent > 1 ? 's' : ''}</span>`);
     return parts.join('');
+  },
+
+  _opStatusBadge(op) {
+    const key = normStr(op.status || '');
+    const sd  = STATUS_DISPLAY[key];
+    if (sd) return `<span class="status-badge ${sd.cls}">${esc(sd.label)}</span>`;
+    const stageLabel = STAGE_LABELS[key];
+    if (stageLabel) return `<span class="cron-etapa-pill" style="color:${STAGE_COLORS[key]}">${esc(stageLabel)}</span>`;
+    return op.status ? `<span class="cron-etapa-lbl">${esc(op.statusRaw || op.status)}</span>` : '<span class="cron-faint">—</span>';
   },
 
   _statusInfo(d) {
