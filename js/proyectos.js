@@ -207,7 +207,7 @@ const Proyectos = {
       if (!sums[t.etapa]) sums[t.etapa] = { total: 0, count: 0, items: [] };
       sums[t.etapa].total += mins;
       sums[t.etapa].count++;
-      sums[t.etapa].items.push({ op_id: t.op_id, nombre_op: t.nombre_op, mins });
+      sums[t.etapa].items.push({ op_id: t.op_id, etapa: t.etapa, nombre_op: t.nombre_op, mins, fecha_inicio: t.fecha_inicio, hora_inicio: t.hora_inicio, fecha_fin: t.fecha_fin, hora_fin: t.hora_fin });
     }
     const result = {};
     for (const [etapa, s] of Object.entries(sums)) {
@@ -224,9 +224,24 @@ const Proyectos = {
     const renderItem = (label, color, { avg, count, items }, isSub) => {
       const rows = items.map(it => `
         <div class="prom-op-row">
-          ${noOpMap[it.op_id] ? `<span class="prom-op-num">${esc(noOpMap[it.op_id])}</span>` : ''}
-          <span class="prom-op-name">${esc(it.nombre_op || '—')}</span>
-          <span class="prom-op-dur">${this._fmtMins(it.mins)}</span>
+          <div class="parte-row-display">
+            ${noOpMap[it.op_id] ? `<span class="prom-op-num">${esc(noOpMap[it.op_id])}</span>` : ''}
+            <span class="prom-op-name">${esc(it.nombre_op || '—')}</span>
+            <span class="prom-op-dur">${this._fmtMins(it.mins)}</span>
+            <button class="btn-tiempo-edit" title="Editar"
+              data-opid="${esc(it.op_id)}" data-etapa="${esc(it.etapa)}" data-nombre="${esc(it.nombre_op || '')}">✏</button>
+          </div>
+          <div class="parte-row-edit" style="display:none">
+            ${noOpMap[it.op_id] ? `<span class="prom-op-num">${esc(noOpMap[it.op_id])}</span>` : ''}
+            <input type="date" class="tiempo-edit-fi" value="${esc(it.fecha_inicio || '')}">
+            <input type="time" class="tiempo-edit-hi" value="${esc(it.hora_inicio || '08:00')}">
+            <span class="parte-edit-arrow">→</span>
+            <input type="date" class="tiempo-edit-ff" value="${esc(it.fecha_fin || '')}">
+            <input type="time" class="tiempo-edit-hf" value="${esc(it.hora_fin || '17:00')}">
+            <button class="btn-tiempo-save"
+              data-opid="${esc(it.op_id)}" data-etapa="${esc(it.etapa)}" data-nombre="${esc(it.nombre_op || '')}">✓</button>
+            <button class="btn-tiempo-cancel">✕</button>
+          </div>
         </div>
       `).join('');
       return `
@@ -260,7 +275,8 @@ const Proyectos = {
     const done = ops
       .filter(op => op.inicioReproceso && op.finReproceso)
       .map(op => ({
-        noOp: op.noOp, name: op.name,
+        opId: op.id, noOp: op.noOp, name: op.name,
+        inicioReproceso: op.inicioReproceso, finReproceso: op.finReproceso,
         days: Math.round((op.finReproceso - op.inicioReproceso) / 86400000),
       }))
       .filter(r => r.days >= 0)
@@ -269,7 +285,8 @@ const Proyectos = {
     const active = ops
       .filter(op => op.inicioReproceso && !op.finReproceso)
       .map(op => ({
-        noOp: op.noOp, name: op.name,
+        opId: op.id, noOp: op.noOp, name: op.name,
+        inicioReproceso: op.inicioReproceso, finReproceso: null,
         days: Math.round((Date.now() - op.inicioReproceso) / 86400000),
       }))
       .sort((a, b) => b.days - a.days);
@@ -280,18 +297,41 @@ const Proyectos = {
     const avgFmt = avg !== null ? (avg % 1 === 0 ? `${avg}d` : `${avg.toFixed(1)}d`) : '—';
     const total  = done.length + active.length;
 
+    const isoD = d => d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
     const rows = [
       ...active.map(r => `
         <div class="prom-op-row">
-          ${r.noOp ? `<span class="prom-op-num">${esc(r.noOp)}</span>` : ''}
-          <span class="prom-op-name">${esc(r.name)}</span>
-          <span class="prom-op-dur" style="color:var(--amber)">⏳ ${r.days}d en curso</span>
+          <div class="parte-row-display">
+            ${r.noOp ? `<span class="prom-op-num">${esc(r.noOp)}</span>` : ''}
+            <span class="prom-op-name">${esc(r.name)}</span>
+            <span class="prom-op-dur" style="color:var(--amber)">⏳ ${r.days}d en curso</span>
+            <button class="btn-repro-edit" title="Editar" data-opid="${esc(r.opId)}" data-fi="${esc(isoD(r.inicioReproceso))}" data-ff="">✏</button>
+          </div>
+          <div class="parte-row-edit" style="display:none">
+            ${r.noOp ? `<span class="prom-op-num">${esc(r.noOp)}</span>` : ''}
+            <input type="date" class="repro-edit-fi" value="${esc(isoD(r.inicioReproceso))}">
+            <span class="parte-edit-arrow">→</span>
+            <input type="date" class="repro-edit-ff" value="" placeholder="Fin">
+            <button class="btn-repro-save" data-opid="${esc(r.opId)}">✓</button>
+            <button class="btn-repro-cancel">✕</button>
+          </div>
         </div>`),
       ...done.map(r => `
         <div class="prom-op-row">
-          ${r.noOp ? `<span class="prom-op-num">${esc(r.noOp)}</span>` : ''}
-          <span class="prom-op-name">${esc(r.name)}</span>
-          <span class="prom-op-dur">✓ ${r.days}d</span>
+          <div class="parte-row-display">
+            ${r.noOp ? `<span class="prom-op-num">${esc(r.noOp)}</span>` : ''}
+            <span class="prom-op-name">${esc(r.name)}</span>
+            <span class="prom-op-dur">✓ ${r.days}d</span>
+            <button class="btn-repro-edit" title="Editar" data-opid="${esc(r.opId)}" data-fi="${esc(isoD(r.inicioReproceso))}" data-ff="${esc(isoD(r.finReproceso))}">✏</button>
+          </div>
+          <div class="parte-row-edit" style="display:none">
+            ${r.noOp ? `<span class="prom-op-num">${esc(r.noOp)}</span>` : ''}
+            <input type="date" class="repro-edit-fi" value="${esc(isoD(r.inicioReproceso))}">
+            <span class="parte-edit-arrow">→</span>
+            <input type="date" class="repro-edit-ff" value="${esc(isoD(r.finReproceso))}">
+            <button class="btn-repro-save" data-opid="${esc(r.opId)}">✓</button>
+            <button class="btn-repro-cancel">✕</button>
+          </div>
         </div>`),
     ].join('');
 
@@ -383,6 +423,102 @@ const Proyectos = {
         const isOpen = list.style.display !== 'none';
         list.style.display = isOpen ? 'none' : '';
         btn.textContent    = isOpen ? '▼ ver' : '▲ ocultar';
+      });
+    });
+
+    // ── Edición tiempos por etapa ─────────────────────────────
+    document.querySelectorAll('.btn-tiempo-edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.prom-op-row');
+        row.querySelector('.parte-row-display').style.display = 'none';
+        row.querySelector('.parte-row-edit').style.display    = '';
+      });
+    });
+
+    document.querySelectorAll('.btn-tiempo-cancel').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.prom-op-row');
+        row.querySelector('.parte-row-edit').style.display    = 'none';
+        row.querySelector('.parte-row-display').style.display = '';
+      });
+    });
+
+    document.querySelectorAll('.btn-tiempo-save').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const row    = btn.closest('.prom-op-row');
+        const edit   = row.querySelector('.parte-row-edit');
+        const opId   = btn.dataset.opid;
+        const etapa  = btn.dataset.etapa;
+        const nombre = btn.dataset.nombre;
+        const fi     = edit.querySelector('.tiempo-edit-fi').value;
+        const hi     = edit.querySelector('.tiempo-edit-hi').value;
+        const ff     = edit.querySelector('.tiempo-edit-ff').value;
+        const hf     = edit.querySelector('.tiempo-edit-hf').value;
+        if (!fi || !ff) { alert('Ingresa fecha inicio y fin.'); return; }
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+        try {
+          await DB.upsertTiempo({ op_id: opId, nombre_op: nombre, etapa, fecha_inicio: fi, hora_inicio: hi, fecha_fin: ff, hora_fin: hf });
+          const idx = (App._dbData.tiempos || []).findIndex(t => t.op_id === opId && t.etapa === etapa);
+          const updated = { op_id: opId, nombre_op: nombre, etapa, fecha_inicio: fi, hora_inicio: hi, fecha_fin: ff, hora_fin: hf };
+          if (idx !== -1) App._dbData.tiempos[idx] = { ...App._dbData.tiempos[idx], ...updated };
+          else App._dbData.tiempos.push(updated);
+          App.rerender();
+        } catch (e) {
+          alert('Error: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
+
+    // ── Edición tiempos de reproceso (ClickUp) ────────────────
+    document.querySelectorAll('.btn-repro-edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.prom-op-row');
+        row.querySelector('.parte-row-display').style.display = 'none';
+        row.querySelector('.parte-row-edit').style.display    = '';
+      });
+    });
+
+    document.querySelectorAll('.btn-repro-cancel').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.prom-op-row');
+        row.querySelector('.parte-row-edit').style.display    = 'none';
+        row.querySelector('.parte-row-display').style.display = '';
+      });
+    });
+
+    document.querySelectorAll('.btn-repro-save').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const row   = btn.closest('.prom-op-row');
+        const edit  = row.querySelector('.parte-row-edit');
+        const opId  = btn.dataset.opid;
+        const fi    = edit.querySelector('.repro-edit-fi').value;
+        const ff    = edit.querySelector('.repro-edit-ff').value;
+        if (!fi) { alert('Ingresa la fecha de inicio de reproceso.'); return; }
+
+        const fieldIds    = App._data?.fieldIds || {};
+        const fieldInicio = fieldIds.inicioReproceso;
+        const fieldFin    = fieldIds.finReproceso;
+        if (!fieldInicio) { alert('No se encontró el campo "Inicio Reproceso" en ClickUp.'); return; }
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+        try {
+          await PlantaAPI.setField(opId, fieldInicio, new Date(fi + 'T12:00:00').getTime());
+          if (ff && fieldFin) await PlantaAPI.setField(opId, fieldFin, new Date(ff + 'T12:00:00').getTime());
+          const op = App._data?.ops.find(o => o.id === opId);
+          if (op) {
+            op.inicioReproceso = new Date(fi + 'T12:00:00');
+            op.finReproceso    = ff ? new Date(ff + 'T12:00:00') : null;
+          }
+          PlantaAPI.clearCache();
+          App.rerender();
+        } catch (e) {
+          alert('Error: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
       });
     });
 

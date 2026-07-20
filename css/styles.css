@@ -1318,11 +1318,34 @@ body {
   opacity: 0.5;
 }
 .btn-parte-edit:hover { opacity: 1; color: var(--accent); }
-.parte-edit-inicio, .parte-edit-fin {
+.parte-edit-inicio, .parte-edit-fin,
+.tiempo-edit-fi, .tiempo-edit-ff, .repro-edit-fi, .repro-edit-ff {
   font-size: 11px; padding: 1px 4px; border-radius: 4px;
   border: 1px solid var(--border); background: var(--card);
   color: var(--text); width: 110px;
 }
+.tiempo-edit-hi, .tiempo-edit-hf {
+  font-size: 11px; padding: 1px 4px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--text); width: 78px;
+}
+.btn-tiempo-edit, .btn-repro-edit {
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; color: var(--muted); padding: 0 2px; flex-shrink: 0;
+  opacity: 0.5;
+}
+.btn-tiempo-edit:hover, .btn-repro-edit:hover { opacity: 1; color: var(--accent); }
+.btn-tiempo-save, .btn-repro-save {
+  font-size: 11px; padding: 1px 6px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--green-border); background: var(--green-bg); color: var(--green);
+  flex-shrink: 0;
+}
+.btn-tiempo-save:hover, .btn-repro-save:hover { background: var(--green); color: #fff; }
+.btn-tiempo-cancel, .btn-repro-cancel {
+  background: none; border: none; cursor: pointer;
+  font-size: 12px; color: var(--muted); padding: 0 2px; flex-shrink: 0;
+}
+.btn-tiempo-cancel:hover, .btn-repro-cancel:hover { color: var(--accent); }
 .parte-edit-arrow { color: var(--muted); flex-shrink: 0; }
 .btn-parte-save {
   font-size: 11px; padding: 1px 6px; border-radius: 4px; cursor: pointer;
