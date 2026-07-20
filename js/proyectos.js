@@ -320,7 +320,7 @@ const Proyectos = {
       if (!sums[p.nombre]) sums[p.nombre] = { total: 0, count: 0, items: [] };
       sums[p.nombre].total += days;
       sums[p.nombre].count++;
-      sums[p.nombre].items.push({ op_id: p.op_id, persona: p.persona, days });
+      sums[p.nombre].items.push({ id: p.id, op_id: p.op_id, persona: p.persona, days, fecha_inicio: p.fecha_inicio, fecha_fin: p.fecha_fin });
     }
     const result = {};
     for (const [nombre, s] of Object.entries(sums)) {
@@ -339,10 +339,22 @@ const Proyectos = {
       .map(([nombre, { avg, count, items }]) => {
         const avgFmt = Number.isInteger(avg) ? `${avg}d` : `${avg.toFixed(1)}d`;
         const rows = items.map(it => `
-          <div class="prom-op-row">
-            ${noOpMap[it.op_id] ? `<span class="prom-op-num">${esc(noOpMap[it.op_id])}</span>` : ''}
-            <span class="prom-op-name">${esc(it.persona || '—')}</span>
-            <span class="prom-op-dur">${it.days}d</span>
+          <div class="prom-op-row" data-parte-id="${esc(it.id)}">
+            <div class="parte-row-display">
+              ${noOpMap[it.op_id] ? `<span class="prom-op-num">${esc(noOpMap[it.op_id])}</span>` : ''}
+              <span class="prom-op-name">${esc(it.persona || '—')}</span>
+              <span class="prom-op-dur">${it.days}d</span>
+              <button class="btn-parte-edit" data-id="${esc(it.id)}" title="Editar fechas">✏</button>
+            </div>
+            <div class="parte-row-edit" style="display:none">
+              ${noOpMap[it.op_id] ? `<span class="prom-op-num">${esc(noOpMap[it.op_id])}</span>` : ''}
+              <span class="prom-op-name">${esc(it.persona || '—')}</span>
+              <input type="date" class="parte-edit-inicio" value="${esc(it.fecha_inicio || '')}" title="Inicio">
+              <span class="parte-edit-arrow">→</span>
+              <input type="date" class="parte-edit-fin" value="${esc(it.fecha_fin || '')}" title="Fin">
+              <button class="btn-parte-save" data-id="${esc(it.id)}">✓</button>
+              <button class="btn-parte-cancel">✕</button>
+            </div>
           </div>
         `).join('');
         return `
@@ -371,6 +383,51 @@ const Proyectos = {
         const isOpen = list.style.display !== 'none';
         list.style.display = isOpen ? 'none' : '';
         btn.textContent    = isOpen ? '▼ ver' : '▲ ocultar';
+      });
+    });
+
+    // ── Edición de fechas por parte ───────────────────────────
+    document.querySelectorAll('.btn-parte-edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.prom-op-row');
+        row.querySelector('.parte-row-display').style.display = 'none';
+        row.querySelector('.parte-row-edit').style.display    = '';
+      });
+    });
+
+    document.querySelectorAll('.btn-parte-cancel').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.prom-op-row');
+        row.querySelector('.parte-row-edit').style.display    = 'none';
+        row.querySelector('.parte-row-display').style.display = '';
+      });
+    });
+
+    document.querySelectorAll('.btn-parte-save').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const row        = btn.closest('.prom-op-row');
+        const id         = btn.dataset.id;
+        const editDiv    = row.querySelector('.parte-row-edit');
+        const inicio     = editDiv.querySelector('.parte-edit-inicio').value;
+        const fin        = editDiv.querySelector('.parte-edit-fin').value;
+        if (!inicio || !fin) { alert('Ingresa ambas fechas.'); return; }
+        if (fin < inicio)    { alert('La fecha fin no puede ser anterior al inicio.'); return; }
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+
+        try {
+          const updated = await DB.updateParte(id, inicio, fin);
+          const idx = (App._dbData.partes || []).findIndex(p => p.id === id);
+          if (idx !== -1) {
+            App._dbData.partes[idx].fecha_inicio = inicio;
+            App._dbData.partes[idx].fecha_fin    = fin;
+          }
+          App.rerender();
+        } catch (e) {
+          alert('Error: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
       });
     });
   },

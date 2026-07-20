@@ -182,6 +182,11 @@ const DB = {
       .update({ fecha_fin }).eq('id', id).select().single());
   },
 
+  async updateParte(id, fecha_inicio, fecha_fin) {
+    return this._q(sb => sb.from('partes_op')
+      .update({ fecha_inicio, fecha_fin }).eq('id', id).select().single());
+  },
+
   async deleteParte(id) {
     const { error } = await this._sb.from('partes_op').delete().eq('id', id);
     if (error) throw error;

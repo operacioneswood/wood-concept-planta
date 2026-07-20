@@ -1306,9 +1306,35 @@ body {
   min-width: 180px; align-items: stretch;
 }
 .prom-op-row {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; flex-direction: column; gap: 2px;
   font-size: 11px; padding: 2px 0;
 }
+.parte-row-display, .parte-row-edit {
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-parte-edit {
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; color: var(--muted); padding: 0 2px; flex-shrink: 0;
+  opacity: 0.5;
+}
+.btn-parte-edit:hover { opacity: 1; color: var(--accent); }
+.parte-edit-inicio, .parte-edit-fin {
+  font-size: 11px; padding: 1px 4px; border-radius: 4px;
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--text); width: 110px;
+}
+.parte-edit-arrow { color: var(--muted); flex-shrink: 0; }
+.btn-parte-save {
+  font-size: 11px; padding: 1px 6px; border-radius: 4px; cursor: pointer;
+  border: 1px solid var(--green-border); background: var(--green-bg); color: var(--green);
+  flex-shrink: 0;
+}
+.btn-parte-save:hover { background: var(--green); color: #fff; }
+.btn-parte-cancel {
+  background: none; border: none; cursor: pointer;
+  font-size: 12px; color: var(--muted); padding: 0 2px; flex-shrink: 0;
+}
+.btn-parte-cancel:hover { color: var(--accent); }
 .prom-op-num  { font-weight: 700; color: var(--muted); white-space: nowrap; flex-shrink: 0; }
 .prom-op-name { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prom-op-dur  { font-weight: 700; color: var(--green); white-space: nowrap; flex-shrink: 0; }
