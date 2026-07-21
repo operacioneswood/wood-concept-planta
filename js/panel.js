@@ -76,7 +76,7 @@ const Panel = {
     `;
   },
 
-  _renderRow({ name, myOps }, assignments) {
+  _renderRow({ name, role, myOps }, assignments) {
     const noWork = myOps.length === 0;
 
     const savedOrder = this._getOrder(name);
@@ -102,8 +102,13 @@ const Panel = {
         const stageId    = a.stage && a.stage !== '_' && a.stage !== 'reproceso' ? a.stage : null;
         const stageLabel = stageId ? STAGE_LABELS[stageId] : null;
         const stageColor = stageId ? STAGE_COLORS[stageId] : null;
-        const inicioKey  = stageId ? STAGE_INICIO[stageId] : null;
-        const finKey     = stageId ? STAGE_FIN[stageId]    : null;
+        const isContratistaEban = stageId === 'ebanisteria' && role === 'contratista';
+        const inicioKey  = stageId
+          ? (isContratistaEban ? 'inicioEbanisteria' : STAGE_INICIO[stageId])
+          : null;
+        const finKey     = stageId
+          ? (isContratistaEban ? 'finEbanisteria' : STAGE_FIN[stageId])
+          : null;
         const stageStarted = inicioKey && op[inicioKey];
         const stageClosed  = finKey && op[finKey];
         const fieldId      = finKey ? (this._fieldIds[finKey] || '') : '';

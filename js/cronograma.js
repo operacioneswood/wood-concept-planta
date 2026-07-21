@@ -43,6 +43,13 @@ const Cronograma = {
     const printBtn = wrap.querySelector('#btn-print-pintura');
     if (printBtn) printBtn.addEventListener('click', () => this._printPintura());
     this._bindEdits(wrap);
+    wrap.querySelectorAll('.btn-print-proj').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const projName = btn.dataset.proj;
+        const projOps  = this._ops.filter(op => (op.project || 'Sin proyecto') === projName);
+        this._printProyecto(projName, projOps);
+      });
+    });
   },
 
   // ── Fábrica ───────────────────────────────────────────────
@@ -96,6 +103,7 @@ const Cronograma = {
 
       const rows = opsorted.map(op => {
         const st = this._statusInfo(op.salidaFabrica);
+        const savedComment = localStorage.getItem('wp_cron_comment_' + op.id) || '';
         return `
           <tr>
             <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
@@ -110,6 +118,7 @@ const Cronograma = {
             </td>
             <td class="cron-fecha-lbl">${op.salidaFabrica ? this._fmtShort(op.salidaFabrica) : '<span class="cron-faint">—</span>'}</td>
             <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
+            <td><input type="text" class="cron-comment-inp" data-opid="${esc(op.id)}" placeholder="Notas…" value="${esc(savedComment)}"></td>
           </tr>
         `;
       }).join('');
@@ -121,6 +130,7 @@ const Cronograma = {
             <span class="cron-hdr-meta">
               <span class="cron-hdr-count">${ops.length} OP${ops.length !== 1 ? 's' : ''}</span>
               ${urgHtml}
+              <button class="btn-print-proj cron-print-btn" data-proj="${esc(project)}" title="Imprimir cronograma de ${esc(project)}">🖨</button>
             </span>
           </div>
           <table class="cron-tbl">
@@ -132,6 +142,7 @@ const Cronograma = {
               <th>Fecha límite</th>
               <th>Fecha</th>
               <th>Estado</th>
+              <th>Comentarios</th>
             </tr></thead>
             <tbody>${rows}</tbody>
           </table>
@@ -303,6 +314,93 @@ const Cronograma = {
       </div>
       ${paintTables}
     `;
+  },
+
+  // ── Print single project schedule ─────────────────────────
+  _printProyecto(projName, ops) {
+    const today  = new Date();
+    const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    const todayFmt = `${today.getDate()} de ${months[today.getMonth()]} de ${today.getFullYear()}`;
+
+    const sorted = [...ops].sort((a, b) => {
+      if (!a.salidaFabrica && !b.salidaFabrica) return 0;
+      if (!a.salidaFabrica) return 1;
+      if (!b.salidaFabrica) return -1;
+      return a.salidaFabrica - b.salidaFabrica;
+    });
+
+    const rows = sorted.map((op, idx) => {
+      const comentario = localStorage.getItem('wp_cron_comment_' + op.id) || '';
+      return `<tr>
+        <td class="td-num">${idx + 1}</td>
+        <td class="td-op">${esc(op.noOp || '—')}</td>
+        <td class="td-desc">${esc(op.name)}</td>
+        <td class="td-date">${op.salidaFabrica ? this._fmtLong(op.salidaFabrica) : '—'}</td>
+        <td class="td-comment">${esc(comentario)}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cronograma — ${esc(projName)}</title>
+<style>
+  @page { size: letter portrait; margin: 0.65in 0.75in; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; color: #111; background: #fff; }
+  .proj-hdr {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    border-bottom: 2.5pt solid #4a7c59; padding-bottom: 8pt; margin-bottom: 12pt;
+  }
+  .proj-title { font-size: 15pt; font-weight: 700; color: #4a7c59; letter-spacing: -0.02em; }
+  .proj-date  { font-size: 9.5pt; color: #666; }
+  table { width: 100%; border-collapse: collapse; orphans: 3; widows: 3; }
+  thead tr { background: #eef4f0; }
+  th {
+    font-size: 9pt; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; color: #555;
+    padding: 6pt 7pt; text-align: left;
+    border-bottom: 1.5pt solid #a8c4b4; white-space: nowrap;
+  }
+  td { padding: 6.5pt 7pt; border-bottom: 0.5pt solid #ddeae0; vertical-align: middle; line-height: 1.35; }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(even) { background: #f7faf8; }
+  .td-num  { width: 18pt; text-align: center; color: #888; font-size: 9.5pt; }
+  .td-op   { width: 70pt; font-weight: 700; color: #4a7c59; white-space: nowrap; }
+  .td-desc { color: #111; }
+  .td-date { width: 90pt; white-space: nowrap; font-size: 10pt; }
+  .td-comment { color: #555; font-size: 10pt; }
+  .tbl-footer { margin-top: 10pt; font-size: 8.5pt; color: #aaa; text-align: right; }
+</style>
+</head>
+<body>
+<div class="proj-hdr">
+  <div class="proj-title">Cronograma — ${esc(projName)}</div>
+  <div class="proj-date">${todayFmt}</div>
+</div>
+<table>
+  <thead>
+    <tr>
+      <th class="td-num">#</th>
+      <th class="td-op">No. OP</th>
+      <th class="td-desc">Descripción</th>
+      <th class="td-date">Fecha</th>
+      <th class="td-comment">Comentarios</th>
+    </tr>
+  </thead>
+  <tbody>${rows}</tbody>
+</table>
+<div class="tbl-footer">${ops.length} ítem${ops.length !== 1 ? 's' : ''} · Wood Concept Planta</div>
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { alert('Permite ventanas emergentes para imprimir.'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 400);
   },
 
   // ── Print pintura schedules ────────────────────────────────
@@ -531,6 +629,19 @@ ${paintersHtml}
           alert('Error al actualizar ClickUp: ' + e.message);
           inp.style.outline = '2px solid var(--red)';
           inp.disabled = false;
+        }
+      });
+    });
+
+    root.querySelectorAll('.cron-comment-inp').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const { opid } = inp.dataset;
+        if (!opid) return;
+        const val = inp.value.trim();
+        if (val) {
+          localStorage.setItem('wp_cron_comment_' + opid, val);
+        } else {
+          localStorage.removeItem('wp_cron_comment_' + opid);
         }
       });
     });

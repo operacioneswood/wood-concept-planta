@@ -22,10 +22,11 @@ const Asignacion = {
 
     const assignments = App.buildAssignments(dbData);
     const priority    = App.buildPriorities(dbData);
+    const personasMap = App.buildPersonasMap(dbData);
     const groups      = this._groupByProject(ops, priority);
 
     const groupsHtml = [...groups.entries()].map(([proj, projOps]) =>
-      this._renderGroup(proj, projOps, assignments, ebanistas)
+      this._renderGroup(proj, projOps, assignments, ebanistas, personasMap)
     ).join('');
 
     const activeCount = ops.filter(op => (assignments[op.id] || []).length > 0).length;
@@ -67,7 +68,7 @@ const Asignacion = {
     return new Map([...map.entries()].sort((a, b) => priorityIdx(a[0]) - priorityIdx(b[0])));
   },
 
-  _renderGroup(projName, projOps, assignments, ebanistas) {
+  _renderGroup(projName, projOps, assignments, ebanistas, personasMap = {}) {
     const collapsed     = this._collapsed.has(projName);
     const safeId        = 'ag-' + projName.replace(/[^a-zA-Z0-9]/g, '_');
     const assignedCount = projOps.filter(op => (assignments[op.id] || []).length > 0).length;
@@ -82,20 +83,29 @@ const Asignacion = {
         </div>
         <div class="asign-group-body ${collapsed ? 'proj-group-collapsed' : ''}" id="${safeId}">
           <div class="asign-cards">
-            ${projOps.map(op => this._renderRow(op, assignments, ebanistas)).join('')}
+            ${projOps.map(op => this._renderRow(op, assignments, ebanistas, personasMap)).join('')}
           </div>
         </div>
       </div>
     `;
   },
 
-  _renderRow(op, assignments, ebanistas) {
+  _renderRow(op, assignments, ebanistas, personasMap = {}) {
     const opAssigns  = assignments[op.id] || [];
     const isAssigned = opAssigns.length > 0;
     const stage      = getCurrentStage(op)
       || opAssigns.find(a => a.stage && a.stage !== '_' && a.stage !== 'reproceso')?.stage
       || null;
     const hasRepro   = !!op.inicioReproceso && !op.finReproceso;
+
+    // Determine if the person assigned to the current stage is a contratista
+    const stageAssign    = stage ? opAssigns.find(a => a.stage === stage) : null;
+    const stagePersonName = stageAssign?.person || '';
+    const isContratista  = personasMap[stagePersonName] === 'contratista'
+      || CONTRATISTAS_CONOCIDOS.has(stagePersonName.toLowerCase());
+    const isContratistaEban = stage === 'ebanisteria' && isContratista;
+    const inicioKey = stage ? (isContratistaEban ? 'inicioEbanisteria' : STAGE_INICIO[stage]) : null;
+    const finKey    = stage ? (isContratistaEban ? 'finEbanisteria'    : STAGE_FIN[stage])    : null;
 
     const personOpts = ebanistas.map(n =>
       `<option value="${esc(n)}">${esc(n)}</option>`
@@ -181,12 +191,17 @@ const Asignacion = {
             ${stage
               ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>`
               : '<span class="muted-txt">—</span>'}
-            <button class="btn-stage-inicio btn-sm" data-op="${esc(op.id)}" data-stage="${esc(stage || '')}" title="Marcar inicio de etapa hoy">▶ Inicio</button>
+            <button class="btn-stage-inicio btn-sm"
+              data-op="${esc(op.id)}"
+              data-stage="${esc(stage || '')}"
+              data-iniciokey="${esc(inicioKey || '')}"
+              data-iscontratista="${isContratista ? '1' : '0'}"
+              data-person="${esc(stagePersonName)}"
+              title="Marcar inicio de etapa hoy">▶ Inicio</button>
             ${(() => {
-              if (!stage) return '';
-              const finKey   = STAGE_FIN[stage];
+              if (!stage || !finKey) return '';
               const fieldId  = this._fieldIds[finKey] || '';
-              const stageOpen = op[STAGE_INICIO[stage]] && !op[finKey];
+              const stageOpen = inicioKey && op[inicioKey] && !op[finKey];
               if (!stageOpen || !fieldId) return '';
               return `<button class="btn-cerrar-etapa btn-sm"
                 data-op="${esc(op.id)}"
@@ -499,7 +514,8 @@ const Asignacion = {
         const stage = btn.dataset.stage || getCurrentStage(op);
         if (!stage) { alert('No hay etapa asignada para este OP'); return; }
 
-        const dateKey = STAGE_INICIO[stage];
+        // Use pre-computed key from dataset (handles contratista case)
+        const dateKey = btn.dataset.iniciokey || STAGE_INICIO[stage];
         const fieldId = fieldIds?.[dateKey];
         if (!fieldId) { alert('Campo de inicio no encontrado en ClickUp'); return; }
 
@@ -514,6 +530,19 @@ const Asignacion = {
         try {
           await PlantaAPI.setField(opId, fieldId, Date.now());
           if (op) op[dateKey] = new Date();
+
+          // For contratistas doing ebanistería, also fill the Ebanista dropdown
+          if (btn.dataset.iscontratista === '1' && stage === 'ebanisteria') {
+            const personName  = btn.dataset.person || '';
+            const ebanistaOpts = fieldIds?.ebanistaOpts || {};
+            const optId = ebanistaOpts[normStr(personName)];
+            if (optId && fieldIds?.ebanista) {
+              await PlantaAPI.setField(opId, fieldIds.ebanista, optId).catch(e =>
+                console.warn('[Inicio] No se pudo asignar ebanista dropdown:', e.message)
+              );
+            }
+          }
+
           PlantaAPI.clearCache();
           Proyectos.render({ ...App._data, dbData: App._dbData });
           btn.textContent = '✓'; btn.style.color = 'var(--green)';

@@ -36,6 +36,7 @@ const PlantaAPI = {
     const dateKeys = [
       'inicioCorte','finCorte','inicioChapilla','finChapilla',
       'inicioEnchape','finEnchape','inicioArmado','finArmado',
+      'inicioEbanisteria','finEbanisteria',
       'inicioPintura','finPintura','inicioReproceso','finReproceso',
       'salidaFabrica','envioFabrica',
     ];
@@ -122,6 +123,7 @@ const PlantaAPI = {
   _detectFields(rawTasks) {
     const fieldMap     = {};   // normalizedName → { id, type, typeConfig }
     const ebanistasSet = new Set();
+    const ebanistaOpts = {};  // normStr(name) → ClickUp option UUID
     const pintoresSet  = new Set();
 
     for (const t of rawTasks) {
@@ -133,7 +135,10 @@ const PlantaAPI = {
         // Collect ebanista dropdown options
         if (norm.includes('ebanista') && cf.type === 'drop_down') {
           for (const opt of (cf.type_config?.options || [])) {
-            if (opt.name) ebanistasSet.add(opt.name);
+            if (opt.name) {
+              ebanistasSet.add(opt.name);
+              ebanistaOpts[normStr(opt.name)] = opt.id;
+            }
           }
         }
         // Collect pintor dropdown options
@@ -163,6 +168,8 @@ const PlantaAPI = {
       finEnchape:         find('fin enchape', 'fin enchapillado'),
       inicioArmado:       find('inicio armado'),
       finArmado:          find('fin armado'),
+      inicioEbanisteria:  find('inicio ebanisteria'),
+      finEbanisteria:     find('fin ebanisteria'),
       inicioPintura:      find('inicio pintura'),
       finPintura:         find('fin pintura'),
       inicioReproceso:    find('inicio reproceso'),
@@ -172,6 +179,7 @@ const PlantaAPI = {
       noOp:               find('no. op', 'no op', 'nro. op', 'nro op', 'numero op', 'num op'),
       nivel:              find('nivel'),
       ebanista:           find('ebanista'),
+      ebanistaOpts,
       cliente:            find('cliente'),
       acabado:            fieldMap['acabado']?.id || null,   // exact match — avoids 'inicio acabado' date fields
       pintor:             find('pintor'),
@@ -256,6 +264,8 @@ const PlantaAPI = {
       finEnchape:          getDate(fieldIds.finEnchape),
       inicioArmado:        getDate(fieldIds.inicioArmado),
       finArmado:           getDate(fieldIds.finArmado),
+      inicioEbanisteria:   getDate(fieldIds.inicioEbanisteria),
+      finEbanisteria:      getDate(fieldIds.finEbanisteria),
       inicioPintura:       getDate(fieldIds.inicioPintura),
       finPintura:          getDate(fieldIds.finPintura),
       inicioReproceso:     getDate(fieldIds.inicioReproceso),
