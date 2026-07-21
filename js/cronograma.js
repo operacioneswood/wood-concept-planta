@@ -154,7 +154,7 @@ const Cronograma = {
   _renderFabricaUrgencia() {
     // All OPs except those in pintura, sorted most urgent first
     const fabOps = this._ops
-      .filter(op => op.status !== 'en pintura')
+      .filter(op => op.status !== 'en pintura' && op.status !== 'pendiente por obra')
       .sort((a, b) => {
         if (!a.salidaFabrica && !b.salidaFabrica) return 0;
         if (!a.salidaFabrica) return 1;
