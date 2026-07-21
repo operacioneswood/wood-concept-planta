@@ -168,7 +168,7 @@ const PlantaAPI = {
       finEnchape:         find('fin enchape', 'fin enchapillado'),
       inicioArmado:       find('inicio armado'),
       finArmado:          find('fin armado'),
-      inicioEbanisteria:  find('inicio ebanisteria'),
+      inicioEbanisteria:  find('inicio ebanisteria', 'incio ebanisteria'),
       finEbanisteria:     find('fin ebanisteria'),
       inicioPintura:      find('inicio pintura'),
       finPintura:         find('fin pintura'),
