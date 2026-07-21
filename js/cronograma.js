@@ -330,7 +330,8 @@ const Cronograma = {
     });
 
     const rows = sorted.map((op, idx) => {
-      const comentario = localStorage.getItem('wp_cron_comment_' + op.id) || '';
+      const saved      = localStorage.getItem('wp_cron_comment_' + op.id) || '';
+      const comentario = saved || (op.status === 'pendiente por obra' ? 'Pendiente por obra' : '');
       return `<tr>
         <td class="td-num">${idx + 1}</td>
         <td class="td-op">${esc(op.noOp || '—')}</td>

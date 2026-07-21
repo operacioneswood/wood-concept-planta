@@ -187,6 +187,7 @@ body {
 .sb-gray   { background: #f1f5f9; color: #64748b; }
 .sb-other  { background: var(--slate-bg);  color: var(--slate);  }
 .sb-repro  { background: #fef08a; color: #713f12; border: 1px solid #fbbf24; font-weight: 700; }
+.sb-obra   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; font-weight: 700; }
 
 .status-badge-sm {
   display: inline-flex; padding: 1px 6px;
