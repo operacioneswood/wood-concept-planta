@@ -37,7 +37,7 @@ const PlantaAPI = {
       'inicioCorte','finCorte','inicioChapilla','finChapilla',
       'inicioEnchape','finEnchape','inicioArmado','finArmado',
       'inicioPintura','finPintura','inicioReproceso','finReproceso',
-      'salidaFabrica',
+      'salidaFabrica','envioFabrica',
     ];
     const out = { ...op };
     for (const k of dateKeys) {
@@ -168,6 +168,7 @@ const PlantaAPI = {
       inicioReproceso:    find('inicio reproceso'),
       finReproceso:       find('fin reproceso'),
       causaReproceso:     find('causa reproceso'),
+      envioFabrica:       find('envio fabrica', 'envío fabrica', 'ingreso fabrica', 'entrada fabrica', 'fecha fabrica', 'fecha envio', 'fecha ingreso'),
       noOp:               find('no. op', 'no op', 'nro. op', 'nro op', 'numero op', 'num op'),
       nivel:              find('nivel'),
       ebanista:           find('ebanista'),
@@ -260,6 +261,7 @@ const PlantaAPI = {
       inicioReproceso:     getDate(fieldIds.inicioReproceso),
       finReproceso:        getDate(fieldIds.finReproceso),
       causaReproceso:      causa,
+      envioFabrica:        getDate(fieldIds.envioFabrica),
       salidaFabrica:       tsToDate(raw.due_date || null),
       acabado: (() => {
         const v = getField(fieldIds.acabado);

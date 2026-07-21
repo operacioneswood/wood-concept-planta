@@ -101,6 +101,7 @@ const Cronograma = {
             <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
             <td class="cron-name">${esc(op.name)}</td>
             <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
+            <td class="cron-fecha-lbl cron-envio-lbl">${op.envioFabrica ? this._fmtShort(op.envioFabrica) : '<span class="cron-faint">—</span>'}</td>
             <td>
               <input type="date" class="cron-date-inp"
                 data-opid="${esc(op.id)}"
@@ -127,6 +128,7 @@ const Cronograma = {
               <th>No. OP</th>
               <th>Descripción</th>
               <th>Etapa</th>
+              <th>Envío Fáb.</th>
               <th>Fecha límite</th>
               <th>Fecha</th>
               <th>Estado</th>
