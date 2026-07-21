@@ -168,7 +168,7 @@ const PlantaAPI = {
       inicioReproceso:    find('inicio reproceso'),
       finReproceso:       find('fin reproceso'),
       causaReproceso:     find('causa reproceso'),
-      envioFabrica:       find('envio fabrica', 'envío fabrica', 'ingreso fabrica', 'entrada fabrica', 'fecha fabrica', 'fecha envio', 'fecha ingreso'),
+      envioFabrica:       find('envio a fabrica', 'envío a fabrica', 'envio fabrica', 'ingreso fabrica', 'entrada fabrica', 'fecha fabrica', 'fecha envio', 'fecha ingreso'),
       noOp:               find('no. op', 'no op', 'nro. op', 'nro op', 'numero op', 'num op'),
       nivel:              find('nivel'),
       ebanista:           find('ebanista'),
