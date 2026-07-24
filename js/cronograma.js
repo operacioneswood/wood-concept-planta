@@ -107,7 +107,7 @@ const Cronograma = {
         return `
           <tr>
             <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
-            <td class="cron-name">${esc(op.name)}</td>
+            <td class="cron-name">${esc(op.name)}${this._contratistaTag(op)}</td>
             <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
             <td class="cron-fecha-lbl cron-envio-lbl">${op.envioFabrica ? this._fmtShort(op.envioFabrica) : '<span class="cron-faint">—</span>'}</td>
             <td>
@@ -173,7 +173,7 @@ const Cronograma = {
           <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
           <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
           <td class="cron-proyecto">${esc(op.project || '—')}</td>
-          <td class="cron-name">${esc(op.name)}</td>
+          <td class="cron-name">${esc(op.name)}${this._contratistaTag(op)}</td>
           <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
           <td class="cron-fecha-lbl cron-envio-lbl">${op.envioFabrica ? this._fmtShort(op.envioFabrica) : '<span class="cron-faint">—</span>'}</td>
           <td>
@@ -554,6 +554,12 @@ ${paintersHtml}
       else if (diff <= 7) urgent++;
     }
     return { overdue, urgent };
+  },
+
+  _contratistaTag(op) {
+    const name = op.ebanista;
+    if (!name || !CONTRATISTAS_CONOCIDOS.has(normStr(name))) return '';
+    return `<span class="cron-contratista-tag">🔧 ${esc(name)}</span>`;
   },
 
   _urgBadgesHtml(overdue, urgent) {
