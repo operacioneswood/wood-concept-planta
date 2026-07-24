@@ -428,8 +428,19 @@ const Cronograma = {
         return a.salidaFabrica - b.salidaFabrica;
       });
 
+      const blankRow = `<tr class="td-blank-row">
+          <td class="td-num"></td>
+          <td class="td-proj"></td>
+          <td class="td-op"></td>
+          <td class="td-desc"></td>
+          <td class="td-date"></td>
+          <td class="td-date td-fin"></td>
+          <td class="td-date"></td>
+          <td class="td-aca"></td>
+        </tr>`;
+
       const rows = ops.map((op, idx) => {
-        return `<tr>
+        return `<tr class="${idx % 2 === 1 ? 'row-alt' : ''}">
           <td class="td-num">${idx + 1}</td>
           <td class="td-proj">${esc(op.project || '—')}</td>
           <td class="td-op">${esc(op.noOp || '—')}</td>
@@ -438,7 +449,7 @@ const Cronograma = {
           <td class="td-date td-fin"></td>
           <td class="td-date">${op.salidaFabrica ? this._fmtLong(op.salidaFabrica) : ''}</td>
           <td class="td-aca">${esc(op.acabado || '')}</td>
-        </tr>`;
+        </tr>${blankRow}`;
       }).join('');
 
       return `
@@ -512,7 +523,7 @@ const Cronograma = {
     line-height: 1.35;
   }
   tr:last-child td { border-bottom: none; }
-  tbody tr:nth-child(even) { background: #faf8f6; }
+  tr.row-alt { background: #faf8f6; }
 
   /* ── Column widths ── */
   .td-num  { width: 18pt;  text-align: center; color: #888; font-size: 9.5pt; }
@@ -524,6 +535,9 @@ const Cronograma = {
   .painter-page + .painter-page { page-break-before: always; }
   .painter-page:last-child { page-break-after: avoid; }
   .td-aca  { width: 82pt;  font-size: 10pt; }
+
+  /* ── Blank row for hand-written urgent items ── */
+  .td-blank-row td { height: 20pt; border-bottom: 0.75pt dashed #c8b8b0; }
 
   /* ── Footer ── */
   .tbl-footer { margin-top: 10pt; font-size: 8.5pt; color: #aaa; text-align: right; }
