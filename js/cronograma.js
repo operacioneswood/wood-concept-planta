@@ -537,7 +537,7 @@ const Cronograma = {
   .td-aca  { width: 82pt;  font-size: 10pt; }
 
   /* ── Blank row for hand-written urgent items ── */
-  .td-blank-row td { height: 20pt; border-bottom: 0.75pt dashed #c8b8b0; }
+  .td-blank-row td { height: 42pt; border-bottom: 1pt dashed #b0a099; }
 
   /* ── Footer ── */
   .tbl-footer { margin-top: 10pt; font-size: 8.5pt; color: #aaa; text-align: right; }
