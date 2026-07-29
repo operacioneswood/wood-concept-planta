@@ -674,6 +674,9 @@ body {
 .btn-cerrar-etapa:hover { background: #bfdbfe; }
 .btn-cerrar-etapa:disabled { opacity: .5; cursor: not-allowed; }
 
+.btn-avanzar-etapa { color: #92400e; border-color: #fde68a; background: #fffbeb; }
+.btn-avanzar-etapa:hover { background: #fef3c7; }
+
 /* ════════════════════════════════════════════════════════════
    ASIGNACIÓN — SEARCH BAR
    ════════════════════════════════════════════════════════════ */
@@ -1131,6 +1134,7 @@ body {
 /* ── Cerrar / Inicio stage buttons ── */
 .tablet .btn-cerrar-etapa { padding: 9px 16px; min-height: 40px; font-size: 13px; }
 .tablet .btn-stage-inicio { padding: 9px 14px; min-height: 40px; }
+.tablet .btn-avanzar-etapa { padding: 9px 14px; min-height: 40px; font-size: 13px; }
 
 /* ── Tablero ── */
 .tablet .tablero-item { padding: 14px 16px; }

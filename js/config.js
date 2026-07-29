@@ -98,8 +98,17 @@ function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-// Derive current stage from OP date fields
-function getCurrentStage(op) {
+// ClickUp workflow statuses that map directly to a production stage.
+const STATUS_TO_STAGE = {
+  corte:            'corte',
+  enchape:          'enchape',
+  ebanisteria:      'ebanisteria',
+  'en ebanisteria': 'ebanisteria',
+  pintura:          'pintura',
+  'en pintura':     'pintura',
+};
+
+function _dateStage(op) {
   for (let i = STAGES.length - 1; i >= 0; i--) {
     const s = STAGES[i].id;
     if (op[STAGE_INICIO[s]] && !op[STAGE_FIN[s]]) return s;
@@ -111,6 +120,23 @@ function getCurrentStage(op) {
     }
   }
   return null;
+}
+
+// Derive current stage from two signals — ClickUp's workflow status and the
+// internal Inicio/Fin date fields — and trust whichever shows more progress.
+// Either one can lag behind the other (ClickUp status changed manually without
+// touching the app, or the app advanced a stage before ClickUp's status caught up),
+// so neither source alone is reliable; the furthest-along stage wins.
+function getCurrentStage(op) {
+  const statusStage = STATUS_TO_STAGE[normStr(op.status || '')] || null;
+  const dateStage    = _dateStage(op);
+
+  if (!statusStage) return dateStage;
+  if (!dateStage) return statusStage;
+
+  const statusIdx = STAGE_IDS.indexOf(statusStage);
+  const dateIdx   = STAGE_IDS.indexOf(dateStage);
+  return statusIdx >= dateIdx ? statusStage : dateStage;
 }
 
 // Count how many stages are fully done

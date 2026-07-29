@@ -107,6 +107,17 @@ const Asignacion = {
     const inicioKey = stage ? (isContratistaEban ? 'inicioEbanisteria' : STAGE_INICIO[stage]) : null;
     const finKey    = stage ? (isContratistaEban ? 'finEbanisteria'    : STAGE_FIN[stage])    : null;
 
+    // Next stage — lets the user advance without being forced to close the current one first
+    const stageIdx  = stage ? STAGE_IDS.indexOf(stage) : -1;
+    const nextStage = stageIdx >= 0 && stageIdx < STAGE_IDS.length - 1 ? STAGE_IDS[stageIdx + 1] : null;
+    const nextAssign     = nextStage ? opAssigns.find(a => a.stage === nextStage) : null;
+    const nextPersonName = nextAssign?.person || '';
+    const nextIsContratista  = personasMap[nextPersonName] === 'contratista'
+      || CONTRATISTAS_CONOCIDOS.has(nextPersonName.toLowerCase());
+    const nextIsContratistaEban = nextStage === 'ebanisteria' && nextIsContratista;
+    const nextInicioKey = nextStage ? (nextIsContratistaEban ? 'inicioEbanisteria' : STAGE_INICIO[nextStage]) : null;
+    const canAdvance = nextStage && inicioKey && op[inicioKey] && nextInicioKey && !op[nextInicioKey];
+
     const personOpts = ebanistas.map(n =>
       `<option value="${esc(n)}">${esc(n)}</option>`
     ).join('');
@@ -212,6 +223,17 @@ const Asignacion = {
                 ✓ Cerrar ${esc(STAGE_LABELS[stage])}
               </button>`;
             })()}
+            ${canAdvance ? `
+              <button class="btn-stage-inicio btn-sm btn-avanzar-etapa"
+                data-op="${esc(op.id)}"
+                data-stage="${esc(nextStage)}"
+                data-iniciokey="${esc(nextInicioKey || '')}"
+                data-iscontratista="${nextIsContratista ? '1' : '0'}"
+                data-person="${esc(nextPersonName)}"
+                title="Avanzar a ${esc(STAGE_LABELS[nextStage])} sin cerrar ${esc(STAGE_LABELS[stage])} — puedes cerrarla después">
+                ⏭ Avanzar a ${esc(STAGE_LABELS[nextStage])}
+              </button>
+            ` : ''}
           </div>
         </div>
         ${opAssigns.length > 0 ? `<div class="asign-chips">${chips}</div>` : ''}
