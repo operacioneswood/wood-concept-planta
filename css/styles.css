@@ -1252,10 +1252,17 @@ body {
   white-space: nowrap; line-height: 1.6;
 }
 .panel-btn-cerrar:hover { background: var(--blue); color: #fff; }
+.panel-btn-avanzar {
+  font-size: 11px; padding: 2px 7px; border-radius: 5px; cursor: pointer;
+  border: 1px solid #fde68a; background: #fffbeb; color: #92400e;
+  white-space: nowrap; line-height: 1.6;
+}
+.panel-btn-avanzar:hover { background: #fbbf24; color: #fff; }
 
 /* Tablet sizing for panel action buttons */
 .tablet .panel-btn-fin,
-.tablet .panel-btn-cerrar {
+.tablet .panel-btn-cerrar,
+.tablet .panel-btn-avanzar {
   font-size: 13px; padding: 6px 12px; min-height: 38px; border-radius: 8px;
 }
 

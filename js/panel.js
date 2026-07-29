@@ -3,14 +3,16 @@
 // ─────────────────────────────────────────────────────────────
 
 const Panel = {
-  _fieldIds:  {},
-  _planosMap: {},
+  _fieldIds:   {},
+  _planosMap:  {},
+  _personasMap: {},
 
   render({ ops, ebanistas, dbData, fieldIds }) {
     this._fieldIds  = fieldIds || {};
     this._planosMap = App.buildPlanosMap(dbData);
     const assignments = App.buildAssignments(dbData);
     const personasMap = App.buildPersonasMap(dbData);
+    this._personasMap = personasMap;
 
     const personData = ebanistas.map(name => {
       const role  = personasMap[name] || 'ebanista';
@@ -114,11 +116,26 @@ const Panel = {
         const fieldId      = finKey ? (this._fieldIds[finKey] || '') : '';
         const showCerrar   = stageStarted && !stageClosed && fieldId;
 
+        // Next stage — lets the user advance without being forced to close the current one first
+        const opAssigns  = assignments[op.id] || [];
+        const stageIdx   = stageId ? STAGE_IDS.indexOf(stageId) : -1;
+        const nextStage  = stageIdx >= 0 && stageIdx < STAGE_IDS.length - 1 ? STAGE_IDS[stageIdx + 1] : null;
+        const nextAssign     = nextStage ? opAssigns.find(a2 => a2.stage === nextStage) : null;
+        const nextPersonName = nextAssign?.person || '';
+        const nextIsContratista = this._personasMap[nextPersonName] === 'contratista'
+          || CONTRATISTAS_CONOCIDOS.has(nextPersonName.toLowerCase());
+        const nextIsContratistaEban = nextStage === 'ebanisteria' && nextIsContratista;
+        const nextInicioKey = nextStage ? (nextIsContratistaEban ? 'inicioEbanisteria' : STAGE_INICIO[nextStage]) : null;
+        const canAdvance = stageStarted && nextStage && nextInicioKey && !op[nextInicioKey];
+
         // Sub-process labels for this stage
         const subsList   = (a.subprocesos || '').split(',').filter(Boolean);
         const subsLabels = subsList.map(id => subproLabel(id));
 
-        return { stageId, stageLabel, stageColor, finKey, fieldId, showCerrar, subsLabels };
+        return {
+          stageId, stageLabel, stageColor, finKey, fieldId, showCerrar, subsLabels,
+          canAdvance, nextStage, nextInicioKey, nextIsContratista, nextPersonName,
+        };
       });
 
       const pills = stageInfos
@@ -148,6 +165,19 @@ const Panel = {
             data-stage="${esc(s.stageId)}"
             data-fieldid="${esc(s.fieldId)}"
             data-datekey="${esc(s.finKey)}">✓ Cerrar${stageInfos.length > 1 ? ' ' + esc(s.stageLabel) : ''}</button>
+        `).join('');
+
+      const avanzarBtns = stageInfos
+        .filter(s => s.canAdvance)
+        .map(s => `
+          <button class="panel-btn-avanzar"
+            data-op="${esc(op.id)}"
+            data-stage="${esc(s.nextStage)}"
+            data-iniciokey="${esc(s.nextInicioKey || '')}"
+            data-iscontratista="${s.nextIsContratista ? '1' : '0'}"
+            data-person="${esc(s.nextPersonName)}"
+            title="Avanzar a ${esc(STAGE_LABELS[s.nextStage])} sin cerrar ${esc(s.stageLabel)} — puedes cerrarla después"
+            >⏭ Avanzar a ${esc(STAGE_LABELS[s.nextStage])}</button>
         `).join('');
 
       // ── Reproceso pill + buttons ────────────────────────────────
@@ -188,6 +218,7 @@ const Panel = {
           <div class="panel-task-actions">
             ${finBtns}
             ${cerrarBtns}
+            ${avanzarBtns}
             ${reproBtns}
           </div>
         </div>
@@ -508,6 +539,48 @@ const Panel = {
           Asignacion._rerender();
         } catch (e) {
           alert('Error al cerrar etapa: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
+
+    // ⏭ Avanzar a la siguiente etapa — sin cerrar la actual
+    document.querySelectorAll('.panel-btn-avanzar').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const opId    = btn.dataset.op;
+        const stage   = btn.dataset.stage;
+        const dateKey = btn.dataset.iniciokey;
+        const fieldId = this._fieldIds[dateKey] || '';
+        const op      = App._data?.ops.find(o => o.id === opId);
+
+        if (!fieldId) { alert('Campo de inicio no encontrado en ClickUp'); return; }
+        if (op?.[dateKey]) { return; }
+
+        const orig = btn.textContent;
+        btn.textContent = '...'; btn.disabled = true;
+
+        try {
+          await PlantaAPI.setField(opId, fieldId, Date.now());
+          if (op) op[dateKey] = new Date();
+
+          // For contratistas doing ebanistería, also fill the Ebanista dropdown
+          if (btn.dataset.iscontratista === '1' && stage === 'ebanisteria') {
+            const personName   = btn.dataset.person || '';
+            const ebanistaOpts = this._fieldIds?.ebanistaOpts || {};
+            const optId = ebanistaOpts[normStr(personName)];
+            if (optId && this._fieldIds?.ebanista) {
+              await PlantaAPI.setField(opId, this._fieldIds.ebanista, optId).catch(e =>
+                console.warn('[Panel] No se pudo asignar ebanista dropdown:', e.message)
+              );
+            }
+          }
+
+          PlantaAPI.clearCache();
+          App.renderPanel();
+          Proyectos.render({ ...App._data, dbData: App._dbData });
+          Asignacion._rerender();
+        } catch (e) {
+          alert('Error al avanzar etapa: ' + e.message);
           btn.textContent = orig; btn.disabled = false;
         }
       });
