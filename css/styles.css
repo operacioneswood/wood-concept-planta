@@ -311,6 +311,7 @@ body {
   padding: 4px 0;
   border-bottom: 1px solid var(--divider);
   font-size: 13px;
+  flex-wrap: wrap;
 }
 .panel-task-row:last-child { border-bottom: none; }
 .panel-task-current .panel-task-name { font-weight: 600; }
