@@ -215,6 +215,73 @@ const Cronograma = {
 
   // ── Pintura ───────────────────────────────────────────────
 
+  _acabadoCategory(acabado) {
+    const a = normStr(acabado || '');
+    if (a.includes('laca')) return 'laca';
+    if (a.includes('alpi') || a.includes('chapilla')) return 'alpi';
+    return 'otro';
+  },
+
+  _pinturaRowHtml(op) {
+    const st = this._statusInfo(op.salidaFabrica);
+    return `
+      <tr>
+        <td class="cron-proyecto">${esc(op.project || '—')}</td>
+        <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
+        <td class="cron-name">${esc(op.name)}</td>
+        <td>
+          <input type="date" class="cron-date-inp"
+            data-opid="${esc(op.id)}"
+            data-fieldkey="inicioPintura"
+            value="${this._toInputVal(op.inicioPintura)}"
+            title="Inicio Pintura">
+        </td>
+        <td>
+          <input type="date" class="cron-date-inp"
+            data-opid="${esc(op.id)}"
+            data-fieldkey="finPintura"
+            value="${this._toInputVal(op.finPintura)}"
+            title="Fin Pintura">
+        </td>
+        <td>
+          <input type="date" class="cron-date-inp"
+            data-opid="${esc(op.id)}"
+            data-fieldkey="salidaFabrica"
+            value="${this._toInputVal(op.salidaFabrica)}"
+            title="Fecha Entrega (límite)">
+        </td>
+        <td>
+          <input type="text" class="cron-text-inp"
+            data-opid="${esc(op.id)}"
+            data-fieldkey="acabado"
+            value="${esc(op.acabado || '')}"
+            placeholder="Acabado...">
+        </td>
+        <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
+      </tr>
+    `;
+  },
+
+  _pinturaSubTable(ops, subLabel) {
+    const rows = ops.map(op => this._pinturaRowHtml(op)).join('');
+    return `
+      ${subLabel ? `<div class="cron-sub-hdr">${esc(subLabel)}</div>` : ''}
+      <table class="cron-tbl cron-tbl-wide">
+        <thead><tr>
+          <th>Cliente</th>
+          <th>No. OP</th>
+          <th>Descripción</th>
+          <th>Inicio Pintura</th>
+          <th>Fin Pintura</th>
+          <th>Fecha Entrega</th>
+          <th>Acabado</th>
+          <th>Estado</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+  },
+
   _renderPintura() {
     const pinturaOps = this._ops.filter(op => op.status === 'en pintura' && op.pintor);
 
@@ -244,45 +311,20 @@ const Cronograma = {
       const { overdue, urgent } = this._urgencyCounts(ops);
       const urgHtml = this._urgBadgesHtml(overdue, urgent);
 
-      const rows = ops.map(op => {
-        const st = this._statusInfo(op.salidaFabrica);
-        return `
-          <tr>
-            <td class="cron-proyecto">${esc(op.project || '—')}</td>
-            <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
-            <td class="cron-name">${esc(op.name)}</td>
-            <td>
-              <input type="date" class="cron-date-inp"
-                data-opid="${esc(op.id)}"
-                data-fieldkey="inicioPintura"
-                value="${this._toInputVal(op.inicioPintura)}"
-                title="Inicio Pintura">
-            </td>
-            <td>
-              <input type="date" class="cron-date-inp"
-                data-opid="${esc(op.id)}"
-                data-fieldkey="finPintura"
-                value="${this._toInputVal(op.finPintura)}"
-                title="Fin Pintura">
-            </td>
-            <td>
-              <input type="date" class="cron-date-inp"
-                data-opid="${esc(op.id)}"
-                data-fieldkey="salidaFabrica"
-                value="${this._toInputVal(op.salidaFabrica)}"
-                title="Fecha Entrega (límite)">
-            </td>
-            <td>
-              <input type="text" class="cron-text-inp"
-                data-opid="${esc(op.id)}"
-                data-fieldkey="acabado"
-                value="${esc(op.acabado || '')}"
-                placeholder="Acabado...">
-            </td>
-            <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
-          </tr>
-        `;
-      }).join('');
+      // Javier's schedule splits into Laca vs ALPI/Chapilla sub-tables
+      let bodyHtml;
+      if (normStr(painter) === 'javier') {
+        const lacaOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'laca');
+        const alpiOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'alpi');
+        const otroOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'otro');
+        bodyHtml = [
+          lacaOps.length ? this._pinturaSubTable(lacaOps, `Laca (${lacaOps.length})`) : '',
+          alpiOps.length ? this._pinturaSubTable(alpiOps, `ALPI / Chapilla (${alpiOps.length})`) : '',
+          otroOps.length ? this._pinturaSubTable(otroOps, `Otro / Sin definir (${otroOps.length})`) : '',
+        ].join('');
+      } else {
+        bodyHtml = this._pinturaSubTable(ops, null);
+      }
 
       return `
         <div class="cron-block">
@@ -293,19 +335,7 @@ const Cronograma = {
               ${urgHtml}
             </span>
           </div>
-          <table class="cron-tbl cron-tbl-wide">
-            <thead><tr>
-              <th>Cliente</th>
-              <th>No. OP</th>
-              <th>Descripción</th>
-              <th>Inicio Pintura</th>
-              <th>Fin Pintura</th>
-              <th>Fecha Entrega</th>
-              <th>Acabado</th>
-              <th>Estado</th>
-            </tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
+          ${bodyHtml}
         </div>
       `;
     }).join('');

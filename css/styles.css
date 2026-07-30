@@ -1493,6 +1493,19 @@ body {
 
 .cron-painter-hdr { background: var(--accent-bg); color: var(--accent); }
 
+.cron-sub-hdr {
+  padding: 7px 16px;
+  background: var(--surface);
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--divider);
+  border-top: 1px solid var(--divider);
+}
+.cron-block .cron-sub-hdr:first-of-type { border-top: none; }
+
 .cron-tbl {
   width: 100%;
   border-collapse: collapse;
