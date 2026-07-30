@@ -450,14 +450,28 @@ const Cronograma = {
     const months  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
     const todayFmt = `${today.getDate()} de ${months[today.getMonth()]} de ${today.getFullYear()}`;
 
-    const paintersHtml = painters.map((painter, pi) => {
+    // Javier's schedule prints as separate Laca / ALPI-Chapilla sections (each its own page)
+    const printSections = [];
+    for (const painter of painters) {
       const ops = [...byPainter[painter]].sort((a, b) => {
         if (!a.salidaFabrica && !b.salidaFabrica) return 0;
         if (!a.salidaFabrica) return 1;
         if (!b.salidaFabrica) return -1;
         return a.salidaFabrica - b.salidaFabrica;
       });
+      if (normStr(painter) === 'javier') {
+        const lacaOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'laca');
+        const alpiOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'alpi');
+        const otroOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'otro');
+        if (lacaOps.length) printSections.push({ title: `${painter} — Laca`, ops: lacaOps });
+        if (alpiOps.length) printSections.push({ title: `${painter} — ALPI / Chapilla`, ops: alpiOps });
+        if (otroOps.length) printSections.push({ title: `${painter} — Otro / Sin definir`, ops: otroOps });
+      } else {
+        printSections.push({ title: painter, ops });
+      }
+    }
 
+    const paintersHtml = printSections.map(({ title, ops }) => {
       const blankRow = `<tr class="td-blank-row">
           <td class="td-num"></td>
           <td class="td-proj"></td>
@@ -485,7 +499,7 @@ const Cronograma = {
       return `
         <div class="painter-page">
           <div class="painter-hdr">
-            <div class="painter-title">Cronograma de Pintura — ${esc(painter)}</div>
+            <div class="painter-title">Cronograma de Pintura — ${esc(title)}</div>
             <div class="painter-date">${todayFmt}</div>
           </div>
           <table>
