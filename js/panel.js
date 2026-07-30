@@ -213,7 +213,7 @@ const Panel = {
           <span class="panel-task-name">${esc(op.name)}</span>
           ${assignDateFmt ? `<span class="panel-assign-date">Asig. ${assignDateFmt}</span>` : ''}
           ${this._planosMap[op.id] ? `<span class="panel-plano-lbl">📐 ${esc(this._planosMap[op.id])}</span>` : ''}
-          ${pills}${reproPill}
+          ${pills}${reproPill}${op.extra ? '<span class="badge-extra-sm">⭐ Extra</span>' : ''}
           ${this._renderPartes(op.id, name, stageInfos)}
           <div class="panel-task-actions">
             ${finBtns}

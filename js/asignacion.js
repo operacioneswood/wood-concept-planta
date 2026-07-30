@@ -195,8 +195,13 @@ const Asignacion = {
             <div>
               ${op.noOp ? `<span class="asign-op-num">${esc(op.noOp)}</span> ` : ''}${esc(op.name)}
               ${hasRepro ? '<span class="badge-reproceso-sm">Reproceso</span>' : ''}
+              ${op.extra ? '<span class="badge-extra-sm">⭐ Extra</span>' : ''}
             </div>
             ${op.project ? `<div class="asign-proj-sub">${esc(op.project)}</div>` : ''}
+            <label class="asign-extra-toggle" title="Marcar como Extra en ClickUp">
+              <input type="checkbox" class="chk-extra" data-op="${esc(op.id)}" ${op.extra ? 'checked' : ''}>
+              Extra
+            </label>
           </div>
           <div class="asign-card-right">
             ${stage
@@ -250,8 +255,8 @@ const Asignacion = {
             <option value="">— Agregar persona —</option>
             ${personOpts}
           </select>
-          <select class="asign-select asign-stage" data-op="${esc(op.id)}">
-            ${stageOpts}
+          <select class="asign-select asign-stage" data-op="${esc(op.id)}" ${op.extra ? 'disabled' : ''}>
+            ${op.extra ? `<option value="ebanisteria" selected>Ebanistería (auto — Extra)</option>` : stageOpts}
           </select>
           <input type="date" class="asign-date" data-op="${esc(op.id)}">
           <button class="btn-save-asign btn-primary btn-sm" data-op="${esc(op.id)}">✓</button>
@@ -293,6 +298,34 @@ const Asignacion = {
 
   _bindEvents(ops, ebanistas, fieldIds) {
     const rerender = () => this._rerender();
+
+    // ── Extra toggle — syncs ClickUp's "Extra" checkbox field ──
+    document.querySelectorAll('.chk-extra').forEach(chk => {
+      chk.addEventListener('change', async () => {
+        const opId    = chk.dataset.op;
+        const fieldId = fieldIds?.extra;
+        const op      = App._data?.ops.find(o => o.id === opId);
+        const checked = chk.checked;
+
+        if (!fieldId) {
+          alert('Campo "Extra" no encontrado en ClickUp');
+          chk.checked = !checked;
+          return;
+        }
+
+        chk.disabled = true;
+        try {
+          await PlantaAPI.setField(opId, fieldId, checked);
+          if (op) op.extra = checked;
+          PlantaAPI.clearCache();
+          rerender();
+        } catch (e) {
+          alert('Error al marcar Extra: ' + e.message);
+          chk.checked = !checked;
+          chk.disabled = false;
+        }
+      });
+    });
 
     // ── Collapse/expand groups ────────────────────────────────
     document.querySelectorAll('.asign-group-hdr').forEach(hdr => {
@@ -366,8 +399,10 @@ const Asignacion = {
         const opId  = btn.dataset.op;
         const card  = document.querySelector(`.asign-card[data-op-id="${opId}"]`);
         if (!card) return;
+        const op     = App._data?.ops.find(o => o.id === opId);
         const person = card.querySelector('.asign-person').value;
-        const stage  = card.querySelector('.asign-stage').value;
+        // Extra items always go straight to Ebanistería, automatically
+        const stage  = op?.extra ? 'ebanisteria' : card.querySelector('.asign-stage').value;
         const date   = card.querySelector('.asign-date').value;
         if (!person) return;
 
@@ -394,6 +429,17 @@ const Asignacion = {
           if (checkedSubs) {
             await DB.updateSubprocesos(opId, stage || '_', person, checkedSubs)
               .catch(e => console.warn('[Asignacion] subprocesos column may not exist:', e.message));
+          }
+          // Extra items: mirror the assigned person into ClickUp's EBANISTA dropdown
+          if (op?.extra && stage === 'ebanisteria') {
+            const ebanistaOpts = fieldIds?.ebanistaOpts || {};
+            const optId = ebanistaOpts[normStr(person)];
+            if (optId && fieldIds?.ebanista) {
+              await PlantaAPI.setField(opId, fieldIds.ebanista, optId).catch(e =>
+                console.warn('[Asignacion] No se pudo asignar ebanista dropdown (extra):', e.message)
+              );
+              PlantaAPI.clearCache();
+            }
           }
         } catch (e) {
           console.error('[Asignacion] save failed:', e.message);

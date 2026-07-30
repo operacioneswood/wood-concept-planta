@@ -183,6 +183,7 @@ const PlantaAPI = {
       cliente:            find('cliente'),
       acabado:            fieldMap['acabado']?.id || null,   // exact match — avoids 'inicio acabado' date fields
       pintor:             find('pintor'),
+      extra:              find('extra'),
     };
     console.log('[CU] _detectFields fieldIds:', JSON.stringify(fieldIds));
 
@@ -243,6 +244,9 @@ const PlantaAPI = {
     const noOpRaw   = getField(fieldIds.noOp);
     const noOp      = noOpRaw !== null && noOpRaw !== undefined ? String(noOpRaw) : '';
 
+    const extraRaw  = getField(fieldIds.extra);
+    const extra     = extraRaw === true || extraRaw === 'true';
+
     return {
       id:                  raw.id,
       name:                raw.name || '',
@@ -255,6 +259,7 @@ const PlantaAPI = {
       statusRaw:           raw.status?.status || '',
       ebanista,
       pintor:              getDropdownName(fieldIds.pintor),
+      extra,
       // Stage dates
       inicioCorte:         getDate(fieldIds.inicioCorte),
       finCorte:            getDate(fieldIds.finCorte),

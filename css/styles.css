@@ -221,6 +221,11 @@ body {
   background: var(--green-bg); color: var(--green);
   font-size: 10px; font-weight: 600;
 }
+.badge-extra-sm {
+  display: inline-flex; padding: 1px 6px; border-radius: 3px;
+  background: #fef3c7; color: #92400e; margin-left: 4px;
+  font-size: 10px; font-weight: 600;
+}
 
 .alert-dot-red {
   display: inline-block; width: 7px; height: 7px;
@@ -633,6 +638,12 @@ body {
 
 .asign-name     { font-weight: 600; display: flex; flex-direction: column; gap: 2px; }
 .asign-proj-sub { font-size: 11px; font-weight: 400; color: var(--muted); }
+.asign-extra-toggle {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; color: #92400e;
+  cursor: pointer; user-select: none; margin-top: 2px;
+}
+.asign-extra-toggle input { accent-color: #d97706; width: 13px; height: 13px; cursor: pointer; }
 .asign-op-num   { font-size: 11px; font-weight: 700; color: var(--primary); background: var(--primary-light, #eff6ff); border-radius: 3px; padding: 1px 5px; margin-right: 2px; }
 .asign-project  { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
