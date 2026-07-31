@@ -40,6 +40,38 @@ const App = {
     return map;
   },
 
+  // op_id → { partnerId, vinculoId } for OPs linked as one (shared plano)
+  buildLinkMap(dbData) {
+    const map = {};
+    for (const row of (dbData?.vinculos || [])) {
+      map[row.op_id_1] = { partnerId: row.op_id_2, vinculoId: row.id };
+      map[row.op_id_2] = { partnerId: row.op_id_1, vinculoId: row.id };
+    }
+    return map;
+  },
+
+  // Collapses linked OP pairs into a single display unit, preserving input order.
+  // Returns [{ ops: [op] }] for singles, or [{ ops: [opA, opB], vinculoId }] for a linked pair.
+  groupLinkedOps(ops, dbData) {
+    const linkMap = this.buildLinkMap(dbData);
+    const byId = new Map(ops.map(o => [o.id, o]));
+    const seen = new Set();
+    const groups = [];
+    for (const op of ops) {
+      if (seen.has(op.id)) continue;
+      const link    = linkMap[op.id];
+      const partner = link && byId.get(link.partnerId);
+      if (partner && !seen.has(partner.id)) {
+        groups.push({ ops: [op, partner], vinculoId: link.vinculoId });
+        seen.add(op.id); seen.add(partner.id);
+      } else {
+        groups.push({ ops: [op] });
+        seen.add(op.id);
+      }
+    }
+    return groups;
+  },
+
   // ── Init ─────────────────────────────────────────────────
   async init() {
     DB.init();
@@ -49,7 +81,7 @@ const App = {
     this._setupTiemposModal();
 
     // Load Supabase data in parallel with ClickUp cache render
-    this._dbData = { asignaciones: [], prioridades: [], produccion: [], personas: [], partes: [] };
+    this._dbData = { asignaciones: [], prioridades: [], produccion: [], personas: [], partes: [], vinculos: [] };
     const [cached] = await Promise.allSettled([
       this._loadDbData(),
     ]);
@@ -73,7 +105,7 @@ const App = {
 
   async _loadDbData() {
     try {
-      const [asignaciones, prioridades, produccion, personas, historial, tiempos, planos, partes] = await Promise.all([
+      const [asignaciones, prioridades, produccion, personas, historial, tiempos, planos, partes, vinculos] = await Promise.all([
         DB.getAsignaciones(),
         DB.getPrioridades(),
         DB.getProduccion(),
@@ -82,6 +114,7 @@ const App = {
         DB.getAllTiempos(),
         DB.getPlanos(),
         DB.getPartes(),
+        DB.getVinculos().catch(e => { console.warn('[App] op_vinculos table missing?', e.message); return []; }),
       ]);
       this._dbData = {
         asignaciones: asignaciones || [],
@@ -92,6 +125,7 @@ const App = {
         tiempos:      tiempos      || [],
         planos:       planos       || [],
         partes:       partes       || [],
+        vinculos:     vinculos     || [],
       };
     } catch (e) {
       console.error('[App] DB load failed:', e.message);
@@ -324,8 +358,9 @@ const App = {
     el('btn-complete-confirm')?.addEventListener('click', () => this._confirmComplete());
   },
 
-  openCompleteModal(opId, opName, ebanistas) {
-    this._pendingCompleteOp = { opId, opName };
+  openCompleteModal(opIds, opName, ebanistas) {
+    const ids = Array.isArray(opIds) ? opIds : [opIds];
+    this._pendingCompleteOp = { opIds: ids, opName };
 
     el('complete-op-name').textContent = opName;
 
@@ -334,9 +369,9 @@ const App = {
     sel.innerHTML = '<option value="">— Persona —</option>' +
       people.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
 
-    // Pre-select assigned person (first assigned)
+    // Pre-select assigned person (first assigned, on the first OP)
     const assignments = this.buildAssignments(this._dbData);
-    const a = (assignments[opId] || [])[0];
+    const a = (assignments[ids[0]] || [])[0];
     if (a?.person) sel.value = a.person;
 
     el('complete-date').value         = todayIso();
@@ -350,8 +385,8 @@ const App = {
   },
 
   async _confirmComplete() {
-    const { opId, opName } = this._pendingCompleteOp || {};
-    if (!opId) return;
+    const { opIds, opName } = this._pendingCompleteOp || {};
+    if (!opIds?.length) return;
 
     const person      = el('complete-person').value;
     const dateVal     = el('complete-date').value;
@@ -360,49 +395,54 @@ const App = {
     if (!person)  { alert('Selecciona una persona'); return; }
     if (!dateVal) { alert('Ingresa una fecha'); return; }
 
-    const op          = this._data?.ops.find(o => o.id === opId);
     const completedAt = isoToDate(dateVal);
-    const firstDate   = op ? firstActivityDate(op) : null;
-    const daysInPlant = (firstDate && completedAt) ? daysBetween(firstDate, completedAt) : null;
-
     const assignments = this.buildAssignments(this._dbData);
-    const stage       = (assignments[opId] || [])[0]?.stage || null;
 
-    // Optimistic update: add to local produccion
-    this._dbData.produccion.unshift({
-      op_id: opId, nombre_op: opName, proyecto: op?.project || '',
-      persona: person, fecha_salida: dateVal,
-      es_reproceso: isReproceso, dias_en_planta: daysInPlant,
-    });
+    for (const opId of opIds) {
+      const op          = this._data?.ops.find(o => o.id === opId);
+      const firstDate   = op ? firstActivityDate(op) : null;
+      const daysInPlant = (firstDate && completedAt) ? daysBetween(firstDate, completedAt) : null;
+      const stage       = (assignments[opId] || [])[0]?.stage || null;
 
-    // Remove from local asignaciones
-    this._dbData.asignaciones = this._dbData.asignaciones.filter(a => a.op_id !== opId);
+      // Optimistic update: add to local produccion
+      this._dbData.produccion.unshift({
+        op_id: opId, nombre_op: opName, proyecto: op?.project || '',
+        persona: person, fecha_salida: dateVal,
+        es_reproceso: isReproceso, dias_en_planta: daysInPlant,
+      });
 
-    // Remove from local prioridades
-    this._dbData.prioridades = this._dbData.prioridades.filter(p => p.proyecto_id !== opId);
+      // Remove from local asignaciones / prioridades
+      this._dbData.asignaciones = this._dbData.asignaciones.filter(a => a.op_id !== opId);
+      this._dbData.prioridades  = this._dbData.prioridades.filter(p => p.proyecto_id !== opId);
+    }
 
     this._closeCompleteModal();
     this._renderAll();
 
     // Persist to Supabase
     try {
-      await DB.addProduccion({
-        op_id:         opId,
-        nombre_op:     opName,
-        proyecto:      op?.project || '',
-        persona:       person,
-        fecha_salida:  dateVal,
-        es_reproceso:  isReproceso,
-        dias_en_planta: daysInPlant,
-      });
-      await DB.removeAsignacion(opId);
+      await Promise.all(opIds.map(async opId => {
+        const op = this._data?.ops.find(o => o.id === opId);
+        const firstDate   = op ? firstActivityDate(op) : null;
+        const daysInPlant = (firstDate && completedAt) ? daysBetween(firstDate, completedAt) : null;
+        await DB.addProduccion({
+          op_id:         opId,
+          nombre_op:     opName,
+          proyecto:      op?.project || '',
+          persona:       person,
+          fecha_salida:  dateVal,
+          es_reproceso:  isReproceso,
+          dias_en_planta: daysInPlant,
+        });
+        await DB.removeAsignacion(opId);
+      }));
     } catch (e) {
       console.error('[App] complete save failed:', e.message);
     }
 
     // Mark complete in ClickUp (status = BODEGA)
     try {
-      await PlantaAPI.markComplete(opId, 'BODEGA');
+      await Promise.all(opIds.map(opId => PlantaAPI.markComplete(opId, 'BODEGA')));
       // Force ClickUp refresh so the OP disappears from active list
       PlantaAPI.clearCache();
       await this._sync({ force: true, silent: true });

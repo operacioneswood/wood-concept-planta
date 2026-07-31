@@ -193,6 +193,26 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
+  // VINCULOS  (2 OPs sharing one physical plano — linked as one)
+  // ════════════════════════════════════════════════════════
+  async getVinculos() {
+    return this._q(sb => sb.from('op_vinculos').select('*'));
+  },
+
+  async addVinculo(op_id_1, op_id_2) {
+    // Canonical order so (A,B) and (B,A) never create duplicate rows
+    const [a, b] = [op_id_1, op_id_2].sort();
+    return this._q(sb => sb.from('op_vinculos')
+      .insert({ op_id_1: a, op_id_2: b })
+      .select().single());
+  },
+
+  async removeVinculo(id) {
+    const { error } = await this._sb.from('op_vinculos').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // ════════════════════════════════════════════════════════
   // SETUP — create tables if they don't exist (run once)
   // ════════════════════════════════════════════════════════
   async setupTables() {
@@ -244,6 +264,14 @@ const DB = {
         proyecto_id      text not null unique,
         proyecto_nombre  text,
         orden            integer not null
+      );
+
+      create table if not exists op_vinculos (
+        id               uuid primary key default gen_random_uuid(),
+        op_id_1          text not null,
+        op_id_2          text not null,
+        created_at       timestamptz default now(),
+        unique(op_id_1, op_id_2)
       );
     `;
     const { error } = await this._sb.rpc('exec_sql', { sql }).single().catch(() => ({ error: null }));

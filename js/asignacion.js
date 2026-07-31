@@ -26,7 +26,7 @@ const Asignacion = {
     const groups      = this._groupByProject(ops, priority);
 
     const groupsHtml = [...groups.entries()].map(([proj, projOps]) =>
-      this._renderGroup(proj, projOps, assignments, ebanistas, personasMap)
+      this._renderGroup(proj, projOps, assignments, ebanistas, personasMap, dbData)
     ).join('');
 
     const activeCount = ops.filter(op => (assignments[op.id] || []).length > 0).length;
@@ -68,10 +68,12 @@ const Asignacion = {
     return new Map([...map.entries()].sort((a, b) => priorityIdx(a[0]) - priorityIdx(b[0])));
   },
 
-  _renderGroup(projName, projOps, assignments, ebanistas, personasMap = {}) {
+  _renderGroup(projName, projOps, assignments, ebanistas, personasMap = {}, dbData) {
     const collapsed     = this._collapsed.has(projName);
     const safeId        = 'ag-' + projName.replace(/[^a-zA-Z0-9]/g, '_');
     const assignedCount = projOps.filter(op => (assignments[op.id] || []).length > 0).length;
+    const linkGroups    = App.groupLinkedOps(projOps, dbData);
+    const linkedIds     = new Set(Object.keys(App.buildLinkMap(dbData)));
 
     return `
       <div class="proj-group asign-group" data-proj="${esc(projName)}">
@@ -83,14 +85,19 @@ const Asignacion = {
         </div>
         <div class="asign-group-body ${collapsed ? 'proj-group-collapsed' : ''}" id="${safeId}">
           <div class="asign-cards">
-            ${projOps.map(op => this._renderRow(op, assignments, ebanistas, personasMap)).join('')}
+            ${linkGroups.map(g => {
+              const linkedOp    = g.ops[1] || null;
+              // Other OPs in this project not already linked to something else — candidates to link with
+              const linkOptions = projOps.filter(o => o.id !== g.ops[0].id && !linkedIds.has(o.id));
+              return this._renderRow(g.ops[0], assignments, ebanistas, personasMap, linkedOp, g.vinculoId || null, linkOptions);
+            }).join('')}
           </div>
         </div>
       </div>
     `;
   },
 
-  _renderRow(op, assignments, ebanistas, personasMap = {}) {
+  _renderRow(op, assignments, ebanistas, personasMap = {}, linkedOp = null, vinculoId = null, linkOptions = []) {
     const opAssigns  = assignments[op.id] || [];
     const isAssigned = opAssigns.length > 0;
     const stage      = getCurrentStage(op)
@@ -175,12 +182,12 @@ const Asignacion = {
             <button class="btn-chip-cancel-parte btn-sm">✕</button>
           </div>
           <input type="text" class="chip-comment"
-            data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}"
+            data-op="${esc(op.id)}" data-op2="${esc(linkedOp?.id || '')}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}"
             value="${esc(a.comentario || '')}" placeholder="Qué hizo...">
           <div class="chip-footer-row">
             <button class="btn-add-chip-parte">+ Parte</button>
-            <button class="btn-chip-fin"    data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">■ Fin</button>
-            <button class="btn-chip-remove" data-op="${esc(op.id)}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">✕</button>
+            <button class="btn-chip-fin"    data-op="${esc(op.id)}" data-op2="${esc(linkedOp?.id || '')}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">■ Fin</button>
+            <button class="btn-chip-remove" data-op="${esc(op.id)}" data-op2="${esc(linkedOp?.id || '')}" data-person="${esc(a.person)}" data-stage="${esc(a.stage || '')}">✕</button>
           </div>
         </div>
       `;
@@ -188,27 +195,46 @@ const Asignacion = {
 
     const searchText = `${op.project || ''} ${op.noOp || ''} ${op.name || ''}`.toLowerCase();
 
+    const op2Attr = ` data-op2="${esc(linkedOp?.id || '')}"`;
+
     return `
       <div class="asign-card ${isAssigned ? 'asign-row-assigned' : 'asign-row-empty'}" data-op-id="${esc(op.id)}" data-search="${esc(searchText)}">
         <div class="asign-card-hdr">
           <div class="asign-name">
             <div>
               ${op.noOp ? `<span class="asign-op-num">${esc(op.noOp)}</span> ` : ''}${esc(op.name)}
+              ${linkedOp ? `<span class="asign-op-num">+ ${esc(linkedOp.noOp || '')}</span> ${esc(linkedOp.name)}` : ''}
               ${hasRepro ? '<span class="badge-reproceso-sm">Reproceso</span>' : ''}
               ${op.extra ? '<span class="badge-extra-sm">⭐ Extra</span>' : ''}
             </div>
             ${op.project ? `<div class="asign-proj-sub">${esc(op.project)}</div>` : ''}
             <label class="asign-extra-toggle" title="Marcar como Extra en ClickUp">
-              <input type="checkbox" class="chk-extra" data-op="${esc(op.id)}" ${op.extra ? 'checked' : ''}>
+              <input type="checkbox" class="chk-extra" data-op="${esc(op.id)}"${op2Attr} ${op.extra ? 'checked' : ''}>
               Extra
             </label>
+            ${linkedOp
+              ? `<div class="asign-link-row">
+                  <span class="asign-link-badge">🔗 Vinculada con ${esc(linkedOp.noOp || linkedOp.name)}</span>
+                  <button class="btn-unlink-op" data-vinculo="${esc(vinculoId || '')}" title="Separar estas dos OPs">✕ Desvincular</button>
+                </div>`
+              : (linkOptions.length ? `
+                <div class="asign-link-row">
+                  <button class="btn-link-op" data-op="${esc(op.id)}">🔗 Vincular con otra OP</button>
+                  <select class="asign-link-picker" data-op="${esc(op.id)}" style="display:none">
+                    <option value="">— Elige la otra OP —</option>
+                    ${linkOptions.map(o => `<option value="${esc(o.id)}">${esc(o.noOp || '')} ${esc(o.name)}</option>`).join('')}
+                  </select>
+                  <button class="btn-link-confirm btn-primary btn-sm" data-op="${esc(op.id)}" style="display:none">✓</button>
+                  <button class="btn-link-cancel btn-sm" style="display:none">✕</button>
+                </div>` : '')
+            }
           </div>
           <div class="asign-card-right">
             ${stage
               ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>`
               : '<span class="muted-txt">—</span>'}
             <button class="btn-stage-inicio btn-sm"
-              data-op="${esc(op.id)}"
+              data-op="${esc(op.id)}"${op2Attr}
               data-stage="${esc(stage || '')}"
               data-iniciokey="${esc(inicioKey || '')}"
               data-iscontratista="${isContratista ? '1' : '0'}"
@@ -220,7 +246,7 @@ const Asignacion = {
               const stageOpen = inicioKey && op[inicioKey] && !op[finKey];
               if (!stageOpen || !fieldId) return '';
               return `<button class="btn-cerrar-etapa btn-sm"
-                data-op="${esc(op.id)}"
+                data-op="${esc(op.id)}"${op2Attr}
                 data-stage="${esc(stage)}"
                 data-fieldid="${esc(fieldId)}"
                 data-datekey="${esc(finKey)}"
@@ -230,7 +256,7 @@ const Asignacion = {
             })()}
             ${canAdvance ? `
               <button class="btn-stage-inicio btn-sm btn-avanzar-etapa"
-                data-op="${esc(op.id)}"
+                data-op="${esc(op.id)}"${op2Attr}
                 data-stage="${esc(nextStage)}"
                 data-iniciokey="${esc(nextInicioKey || '')}"
                 data-iscontratista="${nextIsContratista ? '1' : '0'}"
@@ -245,7 +271,7 @@ const Asignacion = {
         <div class="asign-plano-row">
           <span class="asign-plano-icon">📐</span>
           <span class="asign-plano-lbl">Plano:</span>
-          <select class="asign-plano-sel" data-op="${esc(op.id)}">
+          <select class="asign-plano-sel" data-op="${esc(op.id)}"${op2Attr}>
             <option value="">— Nadie —</option>
             ${ebanistas.map(n => `<option value="${esc(n)}" ${this._planosMap[op.id] === n ? 'selected' : ''}>${esc(n)}</option>`).join('')}
           </select>
@@ -259,8 +285,8 @@ const Asignacion = {
             ${op.extra ? `<option value="ebanisteria" selected>Ebanistería (auto — Extra)</option>` : stageOpts}
           </select>
           <input type="date" class="asign-date" data-op="${esc(op.id)}">
-          <button class="btn-save-asign btn-primary btn-sm" data-op="${esc(op.id)}">✓</button>
-          <button class="btn-complete-op btn-secondary btn-sm" data-op="${esc(op.id)}" data-name="${esc(op.name)}">✔ Listo</button>
+          <button class="btn-save-asign btn-primary btn-sm" data-op="${esc(op.id)}"${op2Attr}>✓</button>
+          <button class="btn-complete-op btn-secondary btn-sm" data-op="${esc(op.id)}"${op2Attr} data-name="${esc(op.name)}">✔ Listo</button>
           <button class="btn-tiempos-asign btn-secondary btn-sm" data-op="${esc(op.id)}">⏱</button>
         </div>
         <div class="asign-subprocesos" id="asign-sub-${esc(op.id)}" style="display:none"></div>
@@ -303,8 +329,8 @@ const Asignacion = {
     document.querySelectorAll('.chk-extra').forEach(chk => {
       chk.addEventListener('change', async () => {
         const opId    = chk.dataset.op;
+        const opId2   = chk.dataset.op2 || null;
         const fieldId = fieldIds?.extra;
-        const op      = App._data?.ops.find(o => o.id === opId);
         const checked = chk.checked;
 
         if (!fieldId) {
@@ -315,8 +341,12 @@ const Asignacion = {
 
         chk.disabled = true;
         try {
-          await PlantaAPI.setField(opId, fieldId, checked);
-          if (op) op.extra = checked;
+          const ids = [opId, opId2].filter(Boolean);
+          await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldId, checked)));
+          for (const id of ids) {
+            const op = App._data?.ops.find(o => o.id === id);
+            if (op) op.extra = checked;
+          }
           PlantaAPI.clearCache();
           rerender();
         } catch (e) {
@@ -351,17 +381,21 @@ const Asignacion = {
     // ── Plano holder ─────────────────────────────────────────
     document.querySelectorAll('.asign-plano-sel').forEach(sel => {
       sel.addEventListener('change', async () => {
-        const opId   = sel.dataset.op;
+        const opId    = sel.dataset.op;
+        const opId2   = sel.dataset.op2 || null;
+        const ids     = [opId, opId2].filter(Boolean);
         const persona = sel.value;
-        if (persona) {
-          App._dbData.planos = App._dbData.planos.filter(p => p.op_id !== opId);
-          App._dbData.planos.push({ op_id: opId, persona });
-          this._planosMap[opId] = persona;
-          DB.setPlano(opId, persona).catch(e => console.warn('[Asignacion] plano save:', e.message));
-        } else {
-          App._dbData.planos = App._dbData.planos.filter(p => p.op_id !== opId);
-          delete this._planosMap[opId];
-          DB.removePlano(opId).catch(e => console.warn('[Asignacion] plano remove:', e.message));
+        for (const id of ids) {
+          if (persona) {
+            App._dbData.planos = App._dbData.planos.filter(p => p.op_id !== id);
+            App._dbData.planos.push({ op_id: id, persona });
+            this._planosMap[id] = persona;
+            DB.setPlano(id, persona).catch(e => console.warn('[Asignacion] plano save:', e.message));
+          } else {
+            App._dbData.planos = App._dbData.planos.filter(p => p.op_id !== id);
+            delete this._planosMap[id];
+            DB.removePlano(id).catch(e => console.warn('[Asignacion] plano remove:', e.message));
+          }
         }
         App.renderPanel();
       });
@@ -397,6 +431,8 @@ const Asignacion = {
     document.querySelectorAll('.btn-save-asign').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId  = btn.dataset.op;
+        const opId2 = btn.dataset.op2 || null;
+        const ids   = [opId, opId2].filter(Boolean);
         const card  = document.querySelector(`.asign-card[data-op-id="${opId}"]`);
         if (!card) return;
         const op     = App._data?.ops.find(o => o.id === opId);
@@ -411,33 +447,37 @@ const Asignacion = {
         const checkedSubs  = [...(subContainer?.querySelectorAll('.subpro-input:checked') || [])]
           .map(c => c.value).join(',');
 
-        // Upsert in local cache (by op+persona+stage)
-        App._dbData.asignaciones = App._dbData.asignaciones.filter(
-          a => !(a.op_id === opId && a.persona === person && a.etapa === (stage || '_'))
-        );
-        App._dbData.asignaciones.push({
-          op_id: opId, etapa: stage || '_', persona: person,
-          fecha_asignacion: date || todayIso(), comentario: '',
-          subprocesos: checkedSubs,
-        });
+        // Upsert in local cache (by op+persona+stage) — linked OPs get the same assignment mirrored
+        for (const id of ids) {
+          App._dbData.asignaciones = App._dbData.asignaciones.filter(
+            a => !(a.op_id === id && a.persona === person && a.etapa === (stage || '_'))
+          );
+          App._dbData.asignaciones.push({
+            op_id: id, etapa: stage || '_', persona: person,
+            fecha_asignacion: date || todayIso(), comentario: '',
+            subprocesos: checkedSubs,
+          });
+        }
 
         App.renderPanel();
         rerender();
 
         try {
-          await DB.setAsignacion(opId, stage || '_', person, date || null, null);
-          if (checkedSubs) {
-            await DB.updateSubprocesos(opId, stage || '_', person, checkedSubs)
-              .catch(e => console.warn('[Asignacion] subprocesos column may not exist:', e.message));
-          }
+          await Promise.all(ids.map(async id => {
+            await DB.setAsignacion(id, stage || '_', person, date || null, null);
+            if (checkedSubs) {
+              await DB.updateSubprocesos(id, stage || '_', person, checkedSubs)
+                .catch(e => console.warn('[Asignacion] subprocesos column may not exist:', e.message));
+            }
+          }));
           // Extra items: mirror the assigned person into ClickUp's EBANISTA dropdown
           if (op?.extra && stage === 'ebanisteria') {
             const ebanistaOpts = fieldIds?.ebanistaOpts || {};
             const optId = ebanistaOpts[normStr(person)];
             if (optId && fieldIds?.ebanista) {
-              await PlantaAPI.setField(opId, fieldIds.ebanista, optId).catch(e =>
+              await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldIds.ebanista, optId).catch(e =>
                 console.warn('[Asignacion] No se pudo asignar ebanista dropdown (extra):', e.message)
-              );
+              )));
               PlantaAPI.clearCache();
             }
           }
@@ -450,7 +490,8 @@ const Asignacion = {
     // ── Mark complete (✔ Listo) ───────────────────────────────
     document.querySelectorAll('.btn-complete-op').forEach(btn => {
       btn.addEventListener('click', () => {
-        App.openCompleteModal(btn.dataset.op, btn.dataset.name, ebanistas);
+        const opIds = [btn.dataset.op, btn.dataset.op2].filter(Boolean);
+        App.openCompleteModal(opIds, btn.dataset.name, ebanistas);
       });
     });
 
@@ -466,15 +507,21 @@ const Asignacion = {
     document.querySelectorAll('.chip-comment').forEach(input => {
       input.addEventListener('change', async () => {
         const opId      = input.dataset.op;
+        const opId2     = input.dataset.op2 || null;
+        const ids       = [opId, opId2].filter(Boolean);
         const person    = input.dataset.person;
         const stage     = input.dataset.stage;
         const comentario = input.value;
-        const row = App._dbData.asignaciones.find(
-          a => a.op_id === opId && a.persona === person && a.etapa === stage
-        );
-        if (row) row.comentario = comentario;
         try {
-          if (row) await DB.setAsignacion(opId, row.etapa, person, row.fecha_asignacion, comentario);
+          for (const id of ids) {
+            const row = App._dbData.asignaciones.find(
+              a => a.op_id === id && a.persona === person && a.etapa === stage
+            );
+            if (row) {
+              row.comentario = comentario;
+              await DB.setAsignacion(id, row.etapa, person, row.fecha_asignacion, comentario);
+            }
+          }
         } catch (e) {
           console.error('[Asignacion] comment save:', e.message);
         }
@@ -485,6 +532,8 @@ const Asignacion = {
     document.querySelectorAll('.btn-chip-fin').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId   = btn.dataset.op;
+        const opId2  = btn.dataset.op2 || null;
+        const ids    = [opId, opId2].filter(Boolean);
         const person = btn.dataset.person;
         const stage  = btn.dataset.stage;
 
@@ -498,26 +547,29 @@ const Asignacion = {
         try {
           const chip        = btn.closest('.asign-chip');
           const comentario  = chip?.querySelector('.chip-comment')?.value || '';
-          const op          = App._data?.ops.find(o => o.id === opId);
           const today       = todayIso();
           const inicioKey   = STAGE_INICIO[stage];
-          const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
 
-          // Grab sub-processes from assignment before it's removed
-          const assignRow   = App._dbData.asignaciones.find(a => a.op_id === opId && a.persona === person && a.etapa === stage);
-          const subprocesos = assignRow?.subprocesos || '';
+          for (const id of ids) {
+            const op          = App._data?.ops.find(o => o.id === id);
+            const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
 
-          const histEntry = { op_id: opId, etapa: stage, persona: person, fecha_inicio: fechaInicio, fecha_fin: today, es_reproceso: false, comentario, subprocesos };
-          App._dbData.historial = (App._dbData.historial || []).filter(
-            h => !(h.op_id === opId && h.etapa === stage && h.persona === person)
-          );
-          App._dbData.historial.unshift(histEntry);
-          DB.upsertHistorial(histEntry).catch(e => console.warn('[Asignacion] historial:', e.message));
+            // Grab sub-processes from assignment before it's removed
+            const assignRow   = App._dbData.asignaciones.find(a => a.op_id === id && a.persona === person && a.etapa === stage);
+            const subprocesos = assignRow?.subprocesos || '';
 
-          App._dbData.asignaciones = App._dbData.asignaciones.filter(
-            a => !(a.op_id === opId && a.persona === person && a.etapa === stage)
-          );
-          DB.removeAsignacion(opId, person, stage).catch(e => console.warn('[Asignacion] remove:', e.message));
+            const histEntry = { op_id: id, etapa: stage, persona: person, fecha_inicio: fechaInicio, fecha_fin: today, es_reproceso: false, comentario, subprocesos };
+            App._dbData.historial = (App._dbData.historial || []).filter(
+              h => !(h.op_id === id && h.etapa === stage && h.persona === person)
+            );
+            App._dbData.historial.unshift(histEntry);
+            DB.upsertHistorial(histEntry).catch(e => console.warn('[Asignacion] historial:', e.message));
+
+            App._dbData.asignaciones = App._dbData.asignaciones.filter(
+              a => !(a.op_id === id && a.persona === person && a.etapa === stage)
+            );
+            DB.removeAsignacion(id, person, stage).catch(e => console.warn('[Asignacion] remove:', e.message));
+          }
 
           App.renderPanel();
           Proyectos.render({ ...App._data, dbData: App._dbData });
@@ -534,13 +586,17 @@ const Asignacion = {
     document.querySelectorAll('.btn-chip-remove').forEach(btn => {
       btn.addEventListener('click', () => {
         const opId   = btn.dataset.op;
+        const opId2  = btn.dataset.op2 || null;
+        const ids    = [opId, opId2].filter(Boolean);
         const person = btn.dataset.person;
         const stage  = btn.dataset.stage;
-        App._dbData.asignaciones = App._dbData.asignaciones.filter(
-          a => !(a.op_id === opId && a.persona === person && a.etapa === stage)
-        );
+        for (const id of ids) {
+          App._dbData.asignaciones = App._dbData.asignaciones.filter(
+            a => !(a.op_id === id && a.persona === person && a.etapa === stage)
+          );
+          DB.removeAsignacion(id, person, stage || null).catch(e => console.warn('[Asignacion] remove:', e.message));
+        }
         App.renderPanel();
-        DB.removeAsignacion(opId, person, stage || null).catch(e => console.warn('[Asignacion] remove:', e.message));
         rerender();
       });
     });
@@ -549,6 +605,8 @@ const Asignacion = {
     document.querySelectorAll('.btn-cerrar-etapa').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId   = btn.dataset.op;
+        const opId2  = btn.dataset.op2 || null;
+        const ids    = [opId, opId2].filter(Boolean);
         const stage  = btn.dataset.stage;
         const fieldId = btn.dataset.fieldid;
         const dateKey = btn.dataset.datekey;
@@ -561,9 +619,11 @@ const Asignacion = {
         btn.textContent = '...'; btn.disabled = true;
 
         try {
-          const op = App._data?.ops.find(o => o.id === opId);
-          await PlantaAPI.setField(opId, fieldId, Date.now());
-          if (op) op[dateKey] = new Date();
+          await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldId, Date.now())));
+          for (const id of ids) {
+            const op = App._data?.ops.find(o => o.id === id);
+            if (op) op[dateKey] = new Date();
+          }
           PlantaAPI.clearCache();
           Proyectos.render({ ...App._data, dbData: App._dbData });
           rerender();
@@ -574,10 +634,12 @@ const Asignacion = {
       });
     });
 
-    // ── ▶ Inicio ──────────────────────────────────────────────
+    // ── ▶ Inicio / ⏭ Avanzar ────────────────────────────────────
     document.querySelectorAll('.btn-stage-inicio').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId  = btn.dataset.op;
+        const opId2 = btn.dataset.op2 || null;
+        const ids   = [opId, opId2].filter(Boolean);
         const op    = App._data?.ops.find(o => o.id === opId);
         const stage = btn.dataset.stage || getCurrentStage(op);
         if (!stage) { alert('No hay etapa asignada para este OP'); return; }
@@ -596,8 +658,11 @@ const Asignacion = {
         const orig = btn.textContent;
         btn.textContent = '...'; btn.disabled = true;
         try {
-          await PlantaAPI.setField(opId, fieldId, Date.now());
-          if (op) op[dateKey] = new Date();
+          await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldId, Date.now())));
+          for (const id of ids) {
+            const o = App._data?.ops.find(x => x.id === id);
+            if (o) o[dateKey] = new Date();
+          }
 
           // For contratistas doing ebanistería, also fill the Ebanista dropdown
           if (btn.dataset.iscontratista === '1' && stage === 'ebanisteria') {
@@ -605,9 +670,9 @@ const Asignacion = {
             const ebanistaOpts = fieldIds?.ebanistaOpts || {};
             const optId = ebanistaOpts[normStr(personName)];
             if (optId && fieldIds?.ebanista) {
-              await PlantaAPI.setField(opId, fieldIds.ebanista, optId).catch(e =>
+              await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldIds.ebanista, optId).catch(e =>
                 console.warn('[Inicio] No se pudo asignar ebanista dropdown:', e.message)
-              );
+              )));
             }
           }
 
@@ -706,6 +771,66 @@ const Asignacion = {
           rerender();
         } catch (e) {
           alert('Error: ' + e.message);
+        }
+      });
+    });
+
+    // ── Vincular OP con otra (comparten un solo plano) ─────────
+    document.querySelectorAll('.btn-link-op').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.asign-link-row');
+        btn.style.display = 'none';
+        row.querySelector('.asign-link-picker').style.display = '';
+        row.querySelector('.btn-link-confirm').style.display  = '';
+        row.querySelector('.btn-link-cancel').style.display   = '';
+      });
+    });
+
+    document.querySelectorAll('.btn-link-cancel').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const row = btn.closest('.asign-link-row');
+        row.querySelector('.btn-link-op').style.display       = '';
+        row.querySelector('.asign-link-picker').style.display = 'none';
+        row.querySelector('.btn-link-confirm').style.display  = 'none';
+        btn.style.display = 'none';
+      });
+    });
+
+    document.querySelectorAll('.btn-link-confirm').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const row    = btn.closest('.asign-link-row');
+        const picker = row.querySelector('.asign-link-picker');
+        const opId   = btn.dataset.op;
+        const opId2  = picker.value;
+        if (!opId2) { alert('Elige la otra OP'); return; }
+
+        const orig = btn.textContent; btn.textContent = '...'; btn.disabled = true;
+        try {
+          const row2 = await DB.addVinculo(opId, opId2);
+          App._dbData.vinculos = App._dbData.vinculos || [];
+          App._dbData.vinculos.push(row2);
+          rerender();
+        } catch (e) {
+          alert('Error al vincular: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
+        }
+      });
+    });
+
+    document.querySelectorAll('.btn-unlink-op').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const vinculoId = btn.dataset.vinculo;
+        if (!vinculoId) return;
+        if (!confirm('¿Separar estas dos OPs? Cada una volverá a mostrarse por separado.')) return;
+
+        const orig = btn.textContent; btn.textContent = '...'; btn.disabled = true;
+        try {
+          await DB.removeVinculo(vinculoId);
+          App._dbData.vinculos = (App._dbData.vinculos || []).filter(v => v.id !== vinculoId);
+          rerender();
+        } catch (e) {
+          alert('Error al desvincular: ' + e.message);
+          btn.textContent = orig; btn.disabled = false;
         }
       });
     });

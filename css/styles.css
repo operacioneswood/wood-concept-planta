@@ -353,6 +353,7 @@ body {
 .panel-task-name {
   flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.panel-link-lbl { font-size: 11px; font-weight: 600; color: var(--accent); }
 
 /* ════════════════════════════════════════════════════════════
    TABLERO TAB
@@ -645,6 +646,21 @@ body {
 }
 .asign-extra-toggle input { accent-color: #d97706; width: 13px; height: 13px; cursor: pointer; }
 .asign-op-num   { font-size: 11px; font-weight: 700; color: var(--primary); background: var(--primary-light, #eff6ff); border-radius: 3px; padding: 1px 5px; margin-right: 2px; }
+
+.asign-link-row { display: flex; align-items: center; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+.asign-link-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; color: var(--accent);
+  background: var(--accent-bg); border-radius: 3px; padding: 1px 6px;
+}
+.btn-link-op, .btn-unlink-op, .btn-link-cancel {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  background: none; border: 1px solid var(--border); border-radius: 5px;
+  padding: 2px 7px; cursor: pointer;
+}
+.btn-link-op:hover  { color: var(--accent); border-color: var(--accent); }
+.btn-unlink-op:hover, .btn-link-cancel:hover { color: var(--red); border-color: var(--red-border); }
+.asign-link-picker { font-size: 11px; padding: 2px 5px; border: 1px solid var(--border); border-radius: 5px; max-width: 220px; }
 .asign-project  { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .asign-select {

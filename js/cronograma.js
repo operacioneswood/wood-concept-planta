@@ -101,18 +101,26 @@ const Cronograma = {
         return a.salidaFabrica - b.salidaFabrica;
       });
 
-      const rows = opsorted.map(op => {
+      const rowGroups = App.groupLinkedOps(opsorted, this._dbData);
+
+      const rows = rowGroups.map(({ ops: groupOps }) => {
+        const op = groupOps[0];
+        const linkedOp = groupOps[1] || null;
+        const opid2Attr = linkedOp ? ` data-opid2="${esc(linkedOp.id)}"` : '';
         const st = this._statusInfo(op.salidaFabrica);
         const savedComment = localStorage.getItem('wp_cron_comment_' + op.id) || '';
         return `
           <tr>
-            <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
-            <td class="cron-name">${esc(op.name)}${this._contratistaTag(op)}</td>
+            <td>
+              ${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}
+              ${linkedOp ? `<br><span class="cron-op-num">${esc(linkedOp.noOp || '')}</span>` : ''}
+            </td>
+            <td class="cron-name">${esc(op.name)}${linkedOp ? `<br>${esc(linkedOp.name)}` : ''}${this._contratistaTag(op)}</td>
             <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
             <td class="cron-fecha-lbl cron-envio-lbl">${op.envioFabrica ? this._fmtShort(op.envioFabrica) : '<span class="cron-faint">—</span>'}</td>
             <td>
               <input type="date" class="cron-date-inp"
-                data-opid="${esc(op.id)}"
+                data-opid="${esc(op.id)}"${opid2Attr}
                 data-fieldkey="salidaFabrica"
                 value="${this._toInputVal(op.salidaFabrica)}">
             </td>
@@ -166,19 +174,27 @@ const Cronograma = {
 
     const { overdue, urgent } = this._urgencyCounts(fabOps);
 
-    const rows = fabOps.map(op => {
+    const rowGroups = App.groupLinkedOps(fabOps, this._dbData);
+
+    const rows = rowGroups.map(({ ops: groupOps }) => {
+      const op = groupOps[0];
+      const linkedOp = groupOps[1] || null;
+      const opid2Attr = linkedOp ? ` data-opid2="${esc(linkedOp.id)}"` : '';
       const st = this._statusInfo(op.salidaFabrica);
       return `
         <tr>
           <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
-          <td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td>
+          <td>
+            ${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}
+            ${linkedOp ? `<br><span class="cron-op-num">${esc(linkedOp.noOp || '')}</span>` : ''}
+          </td>
           <td class="cron-proyecto">${esc(op.project || '—')}</td>
-          <td class="cron-name">${esc(op.name)}${this._contratistaTag(op)}</td>
+          <td class="cron-name">${esc(op.name)}${linkedOp ? `<br>${esc(linkedOp.name)}` : ''}${this._contratistaTag(op)}</td>
           <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
           <td class="cron-fecha-lbl cron-envio-lbl">${op.envioFabrica ? this._fmtShort(op.envioFabrica) : '<span class="cron-faint">—</span>'}</td>
           <td>
             <input type="date" class="cron-date-inp"
-              data-opid="${esc(op.id)}"
+              data-opid="${esc(op.id)}"${opid2Attr}
               data-fieldkey="salidaFabrica"
               value="${this._toInputVal(op.salidaFabrica)}">
           </td>
@@ -217,9 +233,8 @@ const Cronograma = {
 
   _acabadoCategory(acabado) {
     const a = normStr(acabado || '');
-    if (a.includes('laca')) return 'laca';
     if (a.includes('alpi') || a.includes('chapilla')) return 'alpi';
-    return 'otro';
+    return 'laca';
   },
 
   _pinturaRowHtml(op) {
@@ -316,11 +331,9 @@ const Cronograma = {
       if (normStr(painter) === 'javier') {
         const lacaOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'laca');
         const alpiOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'alpi');
-        const otroOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'otro');
         bodyHtml = [
           lacaOps.length ? this._pinturaSubTable(lacaOps, `Laca (${lacaOps.length})`) : '',
           alpiOps.length ? this._pinturaSubTable(alpiOps, `ALPI / Chapilla (${alpiOps.length})`) : '',
-          otroOps.length ? this._pinturaSubTable(otroOps, `Otro / Sin definir (${otroOps.length})`) : '',
         ].join('');
       } else {
         bodyHtml = this._pinturaSubTable(ops, null);
@@ -462,10 +475,8 @@ const Cronograma = {
       if (normStr(painter) === 'javier') {
         const lacaOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'laca');
         const alpiOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'alpi');
-        const otroOps = ops.filter(op => this._acabadoCategory(op.acabado) === 'otro');
         if (lacaOps.length) printSections.push({ title: `${painter} — Laca`, ops: lacaOps });
         if (alpiOps.length) printSections.push({ title: `${painter} — ALPI / Chapilla`, ops: alpiOps });
-        if (otroOps.length) printSections.push({ title: `${painter} — Otro / Sin definir`, ops: otroOps });
       } else {
         printSections.push({ title: painter, ops });
       }
@@ -667,7 +678,8 @@ ${paintersHtml}
   _bindEdits(root) {
     root.querySelectorAll('.cron-date-inp').forEach(inp => {
       inp.addEventListener('change', async () => {
-        const { opid, fieldkey } = inp.dataset;
+        const { opid, opid2, fieldkey } = inp.dataset;
+        const ids = [opid, opid2].filter(Boolean);
         const op = App._data?.ops.find(o => o.id === opid);
         if (!op) return;
         const val = inp.value;
@@ -677,7 +689,7 @@ ${paintersHtml}
         try {
           if (fieldkey === 'salidaFabrica') {
             // Built-in ClickUp due date
-            await PlantaAPI.setDueDate(opid, ms);
+            await Promise.all(ids.map(id => PlantaAPI.setDueDate(id, ms)));
           } else {
             // Custom date field (e.g. inicioPintura)
             const fid = this._fieldIds[fieldkey];
@@ -686,9 +698,12 @@ ${paintersHtml}
               inp.disabled = false;
               return;
             }
-            await PlantaAPI.setField(opid, fid, ms);
+            await Promise.all(ids.map(id => PlantaAPI.setField(id, fid, ms)));
           }
-          op[fieldkey] = new Date(ms);
+          for (const id of ids) {
+            const o = App._data?.ops.find(x => x.id === id);
+            if (o) o[fieldkey] = new Date(ms);
+          }
           inp.style.outline = '2px solid var(--green)';
           setTimeout(() => { inp.style.outline = ''; inp.disabled = false; }, 1200);
           this._draw();

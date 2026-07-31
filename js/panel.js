@@ -90,7 +90,12 @@ const Panel = {
         })
       : myOps;
 
-    const taskList = orderedOps.map((op, idx) => {
+    const orderedGroups = App.groupLinkedOps(orderedOps, App._dbData);
+
+    const taskList = orderedGroups.map((group, idx) => {
+      const op       = group.ops[0];
+      const linkedOp = group.ops[1] || null;
+      const op2Attr  = ` data-op2="${esc(linkedOp?.id || '')}"`;
       const personAssigns = (assignments[op.id] || []).filter(x => x.person === name);
 
       // Earliest assignment date for this person+OP
@@ -152,7 +157,7 @@ const Panel = {
         .filter(s => s.stageId)
         .map(s => `
           <button class="panel-btn-fin"
-            data-op="${esc(op.id)}"
+            data-op="${esc(op.id)}"${op2Attr}
             data-person="${esc(name)}"
             data-stage="${esc(s.stageId)}">■ Fin${stageInfos.length > 1 ? ' ' + esc(s.stageLabel) : ''}</button>
         `).join('');
@@ -161,7 +166,7 @@ const Panel = {
         .filter(s => s.showCerrar)
         .map(s => `
           <button class="panel-btn-cerrar"
-            data-op="${esc(op.id)}"
+            data-op="${esc(op.id)}"${op2Attr}
             data-stage="${esc(s.stageId)}"
             data-fieldid="${esc(s.fieldId)}"
             data-datekey="${esc(s.finKey)}">✓ Cerrar${stageInfos.length > 1 ? ' ' + esc(s.stageLabel) : ''}</button>
@@ -171,7 +176,7 @@ const Panel = {
         .filter(s => s.canAdvance)
         .map(s => `
           <button class="panel-btn-avanzar"
-            data-op="${esc(op.id)}"
+            data-op="${esc(op.id)}"${op2Attr}
             data-stage="${esc(s.nextStage)}"
             data-iniciokey="${esc(s.nextInicioKey || '')}"
             data-iscontratista="${s.nextIsContratista ? '1' : '0'}"
@@ -189,16 +194,16 @@ const Panel = {
         : '';
       const reproBtns = hasReproAssign ? `
         <button class="panel-btn-fin"
-          data-op="${esc(op.id)}" data-person="${esc(name)}" data-stage="reproceso">■ Fin</button>
+          data-op="${esc(op.id)}"${op2Attr} data-person="${esc(name)}" data-stage="reproceso">■ Fin</button>
         ${reproOpen && reproFinFieldId ? `
           <button class="panel-btn-fin-repro"
-            data-op="${esc(op.id)}" data-person="${esc(name)}"
+            data-op="${esc(op.id)}"${op2Attr} data-person="${esc(name)}"
             data-fieldid="${esc(reproFinFieldId)}">✓ Fin Reproceso</button>
         ` : ''}
       ` : '';
 
       const isFirst = idx === 0;
-      const isLast  = idx === orderedOps.length - 1;
+      const isLast  = idx === orderedGroups.length - 1;
 
       return `
         <div class="panel-task-row ${isFirst ? 'panel-task-current' : ''}"
@@ -210,7 +215,7 @@ const Panel = {
           </div>
           ${op.noOp    ? `<span class="panel-op-num">${esc(op.noOp)}</span>` : ''}
           ${op.project ? `<span class="panel-proj-lbl">${esc(op.project)}</span>` : ''}
-          <span class="panel-task-name">${esc(op.name)}</span>
+          <span class="panel-task-name">${esc(op.name)}${linkedOp ? ` <span class="panel-link-lbl">🔗 + ${esc(linkedOp.noOp || linkedOp.name)}</span>` : ''}</span>
           ${assignDateFmt ? `<span class="panel-assign-date">Asig. ${assignDateFmt}</span>` : ''}
           ${this._planosMap[op.id] ? `<span class="panel-plano-lbl">📐 ${esc(this._planosMap[op.id])}</span>` : ''}
           ${pills}${reproPill}${op.extra ? '<span class="badge-extra-sm">⭐ Extra</span>' : ''}
@@ -440,6 +445,8 @@ const Panel = {
     document.querySelectorAll('.panel-btn-fin').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId   = btn.dataset.op;
+        const opId2  = btn.dataset.op2 || null;
+        const ids    = [opId, opId2].filter(Boolean);
         const person = btn.dataset.person;
         const stage  = btn.dataset.stage;
 
@@ -447,30 +454,33 @@ const Panel = {
         btn.textContent = '...'; btn.disabled = true;
 
         try {
-          const op         = App._data?.ops.find(o => o.id === opId);
           const today      = todayIso();
           const inicioKey  = STAGE_INICIO[stage];
-          const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
 
-          // Grab sub-processes from assignment before it's removed
-          const assignRow   = App._dbData.asignaciones.find(a => a.op_id === opId && a.persona === person && a.etapa === stage);
-          const subprocesos = assignRow?.subprocesos || '';
+          for (const id of ids) {
+            const op          = App._data?.ops.find(o => o.id === id);
+            const fechaInicio = op?.[inicioKey] ? op[inicioKey].toISOString().slice(0, 10) : null;
 
-          const histEntry = {
-            op_id: opId, etapa: stage, persona: person,
-            fecha_inicio: fechaInicio, fecha_fin: today,
-            es_reproceso: stage === 'reproceso', comentario: '', subprocesos,
-          };
-          App._dbData.historial = (App._dbData.historial || []).filter(
-            h => !(h.op_id === opId && h.etapa === stage && h.persona === person)
-          );
-          App._dbData.historial.unshift(histEntry);
-          DB.upsertHistorial(histEntry).catch(e => console.warn('[Panel] historial:', e.message));
+            // Grab sub-processes from assignment before it's removed
+            const assignRow   = App._dbData.asignaciones.find(a => a.op_id === id && a.persona === person && a.etapa === stage);
+            const subprocesos = assignRow?.subprocesos || '';
 
-          App._dbData.asignaciones = App._dbData.asignaciones.filter(
-            a => !(a.op_id === opId && a.persona === person && a.etapa === stage)
-          );
-          DB.removeAsignacion(opId, person, stage).catch(e => console.warn('[Panel] remove:', e.message));
+            const histEntry = {
+              op_id: id, etapa: stage, persona: person,
+              fecha_inicio: fechaInicio, fecha_fin: today,
+              es_reproceso: stage === 'reproceso', comentario: '', subprocesos,
+            };
+            App._dbData.historial = (App._dbData.historial || []).filter(
+              h => !(h.op_id === id && h.etapa === stage && h.persona === person)
+            );
+            App._dbData.historial.unshift(histEntry);
+            DB.upsertHistorial(histEntry).catch(e => console.warn('[Panel] historial:', e.message));
+
+            App._dbData.asignaciones = App._dbData.asignaciones.filter(
+              a => !(a.op_id === id && a.persona === person && a.etapa === stage)
+            );
+            DB.removeAsignacion(id, person, stage).catch(e => console.warn('[Panel] remove:', e.message));
+          }
 
           App.renderPanel();
           Proyectos.render({ ...App._data, dbData: App._dbData });
@@ -486,6 +496,8 @@ const Panel = {
     document.querySelectorAll('.panel-btn-fin-repro').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId    = btn.dataset.op;
+        const opId2   = btn.dataset.op2 || null;
+        const ids     = [opId, opId2].filter(Boolean);
         const person  = btn.dataset.person;
         const fieldId = btn.dataset.fieldid;
 
@@ -495,15 +507,16 @@ const Panel = {
         btn.textContent = '...'; btn.disabled = true;
 
         try {
-          await PlantaAPI.setField(opId, fieldId, Date.now());
-          const op = App._data?.ops.find(o => o.id === opId);
-          if (op) op.finReproceso = new Date();
+          await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldId, Date.now())));
+          for (const id of ids) {
+            const op = App._data?.ops.find(o => o.id === id);
+            if (op) op.finReproceso = new Date();
+            App._dbData.asignaciones = App._dbData.asignaciones.filter(
+              a => !(a.op_id === id && a.persona === person && a.etapa === 'reproceso')
+            );
+            DB.removeAsignacion(id, person, 'reproceso').catch(e => console.warn('[Panel] repro remove:', e.message));
+          }
           PlantaAPI.clearCache();
-
-          App._dbData.asignaciones = App._dbData.asignaciones.filter(
-            a => !(a.op_id === opId && a.persona === person && a.etapa === 'reproceso')
-          );
-          DB.removeAsignacion(opId, person, 'reproceso').catch(e => console.warn('[Panel] repro remove:', e.message));
 
           App.renderPanel();
           Proyectos.render({ ...App._data, dbData: App._dbData });
@@ -519,6 +532,8 @@ const Panel = {
     document.querySelectorAll('.panel-btn-cerrar').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId   = btn.dataset.op;
+        const opId2  = btn.dataset.op2 || null;
+        const ids    = [opId, opId2].filter(Boolean);
         const stage  = btn.dataset.stage;
         const fieldId = btn.dataset.fieldid;
         const dateKey = btn.dataset.datekey;
@@ -530,9 +545,11 @@ const Panel = {
         btn.textContent = '...'; btn.disabled = true;
 
         try {
-          const op = App._data?.ops.find(o => o.id === opId);
-          await PlantaAPI.setField(opId, fieldId, Date.now());
-          if (op) op[dateKey] = new Date();
+          await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldId, Date.now())));
+          for (const id of ids) {
+            const op = App._data?.ops.find(o => o.id === id);
+            if (op) op[dateKey] = new Date();
+          }
           PlantaAPI.clearCache();
           App.renderPanel();
           Proyectos.render({ ...App._data, dbData: App._dbData });
@@ -548,6 +565,8 @@ const Panel = {
     document.querySelectorAll('.panel-btn-avanzar').forEach(btn => {
       btn.addEventListener('click', async () => {
         const opId    = btn.dataset.op;
+        const opId2   = btn.dataset.op2 || null;
+        const ids     = [opId, opId2].filter(Boolean);
         const stage   = btn.dataset.stage;
         const dateKey = btn.dataset.iniciokey;
         const fieldId = this._fieldIds[dateKey] || '';
@@ -560,8 +579,11 @@ const Panel = {
         btn.textContent = '...'; btn.disabled = true;
 
         try {
-          await PlantaAPI.setField(opId, fieldId, Date.now());
-          if (op) op[dateKey] = new Date();
+          await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldId, Date.now())));
+          for (const id of ids) {
+            const o = App._data?.ops.find(x => x.id === id);
+            if (o) o[dateKey] = new Date();
+          }
 
           // For contratistas doing ebanistería, also fill the Ebanista dropdown
           if (btn.dataset.iscontratista === '1' && stage === 'ebanisteria') {
@@ -569,9 +591,9 @@ const Panel = {
             const ebanistaOpts = this._fieldIds?.ebanistaOpts || {};
             const optId = ebanistaOpts[normStr(personName)];
             if (optId && this._fieldIds?.ebanista) {
-              await PlantaAPI.setField(opId, this._fieldIds.ebanista, optId).catch(e =>
+              await Promise.all(ids.map(id => PlantaAPI.setField(id, this._fieldIds.ebanista, optId).catch(e =>
                 console.warn('[Panel] No se pudo asignar ebanista dropdown:', e.message)
-              );
+              )));
             }
           }
 
