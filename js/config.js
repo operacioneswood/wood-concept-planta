@@ -19,7 +19,7 @@ const STAGE_INICIO = { corte: 'inicioCorte', enchape: 'inicioEnchape', ebanister
 const STAGE_FIN    = { corte: 'finCorte',    enchape: 'finEnchape',    ebanisteria: 'finArmado',    pintura: 'finPintura'    };
 
 // ── ClickUp statuses that count as "in plant" ─────────────────
-const ACTIVE_STATUSES = new Set(['fabrica', 'corte', 'enchape', 'ebanisteria', 'en ebanisteria', 'en pintura', 'pendiente de revision', 'reproceso', 'pendiente por obra']);
+const ACTIVE_STATUSES = new Set(['fabrica', 'corte', 'enchape', 'ebanisteria', 'en ebanisteria', 'en pintura', 'pendiente de revision', 'reproceso', 'pendiente por obra', 'pendiente chapilla']);
 
 const STATUS_DISPLAY = {
   'fabrica':               { label: 'Fábrica',              cls: 'sb-green'  },
@@ -28,6 +28,7 @@ const STATUS_DISPLAY = {
   'pendiente de revision': { label: 'Pend. Revisión',       cls: 'sb-gray'   },
   'reproceso':             { label: 'Reproceso',            cls: 'sb-repro'  },
   'pendiente por obra':    { label: 'Pend. por Obra',       cls: 'sb-obra'   },
+  'pendiente chapilla':    { label: 'Pend. Chapilla',       cls: 'sb-chapilla' },
 };
 
 // ── Performance targets per role ─────────────────────────────
