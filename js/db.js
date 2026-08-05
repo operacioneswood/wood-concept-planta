@@ -26,8 +26,11 @@ const DB = {
   // ════════════════════════════════════════════════════════
   // PERSONAS
   // ════════════════════════════════════════════════════════
+  // Fetches everyone, active AND inactive — the app needs to know who's
+  // been deliberately deactivated so it can keep hiding them even though
+  // they may still be a live option in ClickUp's EBANISTA dropdown.
   async getPersonas() {
-    return this._q(sb => sb.from('personas').select('*').eq('activo', true).order('nombre'));
+    return this._q(sb => sb.from('personas').select('*').order('nombre'));
   },
 
   async upsertPersona(nombre, tipo) {

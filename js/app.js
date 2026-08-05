@@ -40,6 +40,14 @@ const App = {
     return map;
   },
 
+  // Names explicitly deleted from the web app — stays hidden even if the
+  // name is still a live option in ClickUp's EBANISTA/pintor dropdown.
+  buildDeactivatedSet(dbData) {
+    return new Set(
+      (dbData?.personas || []).filter(p => p.activo === false).map(p => normStr(p.nombre))
+    );
+  },
+
   // op_id → { partnerId, vinculoId } for OPs linked as one (shared plano)
   buildLinkMap(dbData) {
     const map = {};
@@ -206,13 +214,14 @@ const App = {
   // ── Render all tabs ───────────────────────────────────────
   _renderAll() {
     if (!this._data) return;
-    // Combine ClickUp people + anyone already in Supabase personas
+    // Combine ClickUp people + anyone already in Supabase personas, minus deleted names
     const supabasePeople = (this._dbData.personas || []).filter(p => p.activo).map(p => p.nombre);
+    const deactivated = this.buildDeactivatedSet(this._dbData);
     const allPeople = [...new Set([
       ...(this._data.ebanistas || []),
       ...(this._data.pintores  || []),
       ...supabasePeople,
-    ])].filter(n => !isExcluded(n));
+    ])].filter(n => !isExcluded(n) && !deactivated.has(normStr(n)));
     const payload = { ...this._data, ebanistas: allPeople, dbData: this._dbData };
     Panel.render(payload);
     Tablero.render(payload);
@@ -230,7 +239,9 @@ const App = {
   renderAsignacion() {
     if (!this._data) return;
     const supabasePeople = (this._dbData.personas || []).filter(p => p.activo).map(p => p.nombre);
-    const allPeople = [...new Set([...(this._data.ebanistas || []), ...(this._data.pintores || []), ...supabasePeople])].filter(n => !isExcluded(n));
+    const deactivated = this.buildDeactivatedSet(this._dbData);
+    const allPeople = [...new Set([...(this._data.ebanistas || []), ...(this._data.pintores || []), ...supabasePeople])]
+      .filter(n => !isExcluded(n) && !deactivated.has(normStr(n)));
     Asignacion.render({ ...this._data, ebanistas: allPeople, dbData: this._dbData });
   },
 
@@ -310,7 +321,9 @@ const App = {
   _renderRolesList() {
     const container = el('cfg-roles-list');
     if (!container) return;
-    const clickupPeople = [...new Set([...(this._data?.ebanistas || []), ...(this._data?.pintores || [])])];
+    const deactivated   = this.buildDeactivatedSet(this._dbData);
+    const clickupPeople = [...new Set([...(this._data?.ebanistas || []), ...(this._data?.pintores || [])])]
+      .filter(n => !deactivated.has(normStr(n)));
     const manualPeople  = (this._dbData.personas || [])
       .filter(p => p.activo && (p.origen || 'clickup') === 'manual')
       .map(p => p.nombre);
@@ -387,15 +400,12 @@ const App = {
     container.querySelectorAll('.role-del-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const name = btn.dataset.name;
-        const stillInClickup = clickupPeople.includes(name);
-        const warning = stillInClickup
-          ? `¿Eliminar a ${name} de la web app?\n\nSigue existiendo como opción en el dropdown EBANISTA de ClickUp, así que volverá a aparecer aquí en la próxima sincronización a menos que también lo borres en ClickUp.`
-          : `¿Eliminar a ${name} de la web app?`;
-        if (!confirm(warning)) return;
+        if (!confirm(`¿Eliminar a ${name} de la web app?\n\nNo borra la opción del dropdown EBANISTA en ClickUp — solo deja de estar disponible para asignar aquí. Puedes volver a agregarlo con "+ Agregar" cuando quieras.`)) return;
 
-        this._dbData.personas = this._dbData.personas.filter(p => p.nombre !== name);
+        const idx = this._dbData.personas.findIndex(p => p.nombre === name);
+        if (idx !== -1) this._dbData.personas[idx].activo = false;
+        else this._dbData.personas.push({ nombre: name, tipo: personasMap[name] || 'ebanista', activo: false, origen: 'clickup' });
         this._renderAll();
-        this._renderRolesList();
         try {
           await DB.setPersonaActivo(name, false);
         } catch (e) {
@@ -415,10 +425,10 @@ const App = {
       const tipo = tipoSel.value;
       if (!name) { nameInp.focus(); return; }
 
-      this._dbData.personas = (this._dbData.personas || []).filter(p => p.nombre !== name);
-      this._dbData.personas.push({ nombre: name, tipo, activo: true, origen: 'manual' });
+      const idx = (this._dbData.personas || []).findIndex(p => p.nombre === name);
+      if (idx !== -1) { this._dbData.personas[idx] = { ...this._dbData.personas[idx], tipo, activo: true, origen: 'manual' }; }
+      else { (this._dbData.personas ||= []).push({ nombre: name, tipo, activo: true, origen: 'manual' }); }
       this._renderAll();
-      this._renderRolesList();
       try {
         await DB.addPersonaManual(name, tipo);
       } catch (e) {
