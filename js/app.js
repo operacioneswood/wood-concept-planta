@@ -144,6 +144,8 @@ const App = {
       await this._loadDbData();
       // Seed personas from ClickUp ebanistas + pintores dropdowns
       await this._seedPersonas(this._data.ebanistas || [], this._data.pintores || []);
+      // Hide people removed from ClickUp's dropdown (manually-added people are exempt)
+      await this._pruneStalePersonas(this._data.ebanistas || [], this._data.pintores || []);
       // Auto-historial cross-reference
       await Sync.runAutoHistorial(this._data.ops || [], this._dbData.asignaciones);
       this._renderAll();
@@ -172,6 +174,21 @@ const App = {
     if (changed) {
       this._dbData.personas = await DB.getPersonas().catch(() => this._dbData.personas);
     }
+  },
+
+  // Deactivate ClickUp-sourced personas whose name is no longer a live
+  // dropdown option — people added manually from the app are left alone.
+  async _pruneStalePersonas(ebanistas, pintores = []) {
+    const current = new Set([...ebanistas, ...pintores].map(n => normStr(n)));
+    const stale = (this._dbData.personas || []).filter(p =>
+      p.activo && (p.origen || 'clickup') !== 'manual' && !current.has(normStr(p.nombre))
+    );
+    if (!stale.length) return;
+
+    for (const p of stale) {
+      try { await DB.setPersonaActivo(p.nombre, false); } catch (e) { console.warn('[App] prune:', p.nombre, e.message); }
+    }
+    this._dbData.personas = this._dbData.personas.filter(p => !stale.includes(p));
   },
 
   _syncLabel() {
@@ -293,19 +310,40 @@ const App = {
   _renderRolesList() {
     const container = el('cfg-roles-list');
     if (!container) return;
-    const people = [...new Set([...(this._data?.ebanistas || []), ...(this._data?.pintores || [])])];
+    const clickupPeople = [...new Set([...(this._data?.ebanistas || []), ...(this._data?.pintores || [])])];
+    const manualPeople  = (this._dbData.personas || [])
+      .filter(p => p.activo && (p.origen || 'clickup') === 'manual')
+      .map(p => p.nombre);
+    const people = [...new Set([...clickupPeople, ...manualPeople])].sort((a, b) => a.localeCompare(b));
     const personasMap = this.buildPersonasMap(this._dbData);
+    const origenMap = {};
+    for (const p of (this._dbData.personas || [])) origenMap[p.nombre] = p.origen || 'clickup';
+
+    const addFormHtml = `
+      <div class="role-add-row">
+        <input type="text" id="role-add-name" class="role-add-input" placeholder="Nombre de la persona...">
+        <select id="role-add-tipo" class="role-add-select">
+          <option value="ebanista">Ebanista</option>
+          <option value="pintor">Pintor</option>
+          <option value="contratista">Contratista</option>
+        </select>
+        <button id="role-add-btn" class="role-add-btn">+ Agregar</button>
+      </div>
+      <div class="cfg-hint">Agregar aquí no crea la opción en ClickUp — solo permite asignarle trabajo dentro de la web app.</div>
+    `;
 
     if (!people.length) {
-      container.innerHTML = '<div class="cfg-hint">Sincroniza con ClickUp para ver el personal del dropdown EBANISTA.</div>';
+      container.innerHTML = addFormHtml + '<div class="cfg-hint">Sincroniza con ClickUp para ver el personal del dropdown EBANISTA.</div>';
+      this._bindRoleAddForm();
       return;
     }
 
-    container.innerHTML = people.map(name => {
-      const tipo = personasMap[name] || (CONTRATISTAS_CONOCIDOS.has(normStr(name)) ? 'contratista' : 'ebanista');
+    container.innerHTML = addFormHtml + people.map(name => {
+      const tipo     = personasMap[name] || (CONTRATISTAS_CONOCIDOS.has(normStr(name)) ? 'contratista' : 'ebanista');
+      const isManual = origenMap[name] === 'manual';
       return `
         <div class="role-row">
-          <span class="role-name">${esc(name)}</span>
+          <span class="role-name">${esc(name)}${isManual ? ' <span class="role-manual-tag">Manual</span>' : ''}</span>
           <div class="role-radios">
             <label class="role-label">
               <input type="radio" name="role-${esc(name.replace(/\s/g,'_'))}" value="ebanista"
@@ -323,6 +361,7 @@ const App = {
               Contratista
             </label>
           </div>
+          <button class="role-del-btn" data-name="${esc(name)}" title="Eliminar de la web app">🗑</button>
         </div>
       `;
     }).join('');
@@ -343,6 +382,48 @@ const App = {
           console.error('[App] role save failed:', e.message);
         }
       });
+    });
+
+    container.querySelectorAll('.role-del-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const name = btn.dataset.name;
+        const stillInClickup = clickupPeople.includes(name);
+        const warning = stillInClickup
+          ? `¿Eliminar a ${name} de la web app?\n\nSigue existiendo como opción en el dropdown EBANISTA de ClickUp, así que volverá a aparecer aquí en la próxima sincronización a menos que también lo borres en ClickUp.`
+          : `¿Eliminar a ${name} de la web app?`;
+        if (!confirm(warning)) return;
+
+        this._dbData.personas = this._dbData.personas.filter(p => p.nombre !== name);
+        this._renderAll();
+        this._renderRolesList();
+        try {
+          await DB.setPersonaActivo(name, false);
+        } catch (e) {
+          alert('Error al eliminar: ' + e.message);
+        }
+      });
+    });
+
+    this._bindRoleAddForm();
+  },
+
+  _bindRoleAddForm() {
+    el('role-add-btn')?.addEventListener('click', async () => {
+      const nameInp = el('role-add-name');
+      const tipoSel = el('role-add-tipo');
+      const name = nameInp.value.trim();
+      const tipo = tipoSel.value;
+      if (!name) { nameInp.focus(); return; }
+
+      this._dbData.personas = (this._dbData.personas || []).filter(p => p.nombre !== name);
+      this._dbData.personas.push({ nombre: name, tipo, activo: true, origen: 'manual' });
+      this._renderAll();
+      this._renderRolesList();
+      try {
+        await DB.addPersonaManual(name, tipo);
+      } catch (e) {
+        alert('Error al agregar: ' + e.message);
+      }
     });
   },
 

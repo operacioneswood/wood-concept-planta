@@ -1079,6 +1079,34 @@ body {
 .role-label:has(input:checked) { color: var(--text); font-weight: 600; }
 .role-label input { cursor: pointer; }
 
+.role-del-btn {
+  background: none; border: 1px solid var(--border); border-radius: 5px;
+  padding: 3px 7px; font-size: 12px; cursor: pointer; color: var(--muted);
+  margin-left: 10px; flex-shrink: 0;
+}
+.role-del-btn:hover { color: var(--red); border-color: var(--red-border); }
+.role-manual-tag {
+  font-size: 10px; font-weight: 600; color: var(--accent);
+  background: var(--accent-bg); border-radius: 3px; padding: 1px 5px; margin-left: 4px;
+}
+.role-add-row {
+  display: flex; gap: 8px; padding: 10px 0; margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.role-add-input {
+  flex: 1; border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; font-family: inherit;
+}
+.role-add-select {
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; font-family: inherit; background: var(--card);
+}
+.role-add-btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.role-add-btn:hover { opacity: .9; }
+
 .complete-op-name {
   font-size: 14px; font-weight: 700;
   padding: 10px 0 16px; border-bottom: 1px solid var(--divider);

@@ -37,6 +37,15 @@ const DB = {
     ));
   },
 
+  // Added directly from the web app — not sourced from ClickUp's EBANISTA dropdown,
+  // so it's exempt from the auto-prune that hides people removed from ClickUp.
+  async addPersonaManual(nombre, tipo) {
+    return this._q(sb => sb.from('personas').upsert(
+      { nombre, tipo, activo: true, origen: 'manual' },
+      { onConflict: 'nombre' }
+    ));
+  },
+
   async setPersonaActivo(nombre, activo) {
     return this._q(sb => sb.from('personas').update({ activo }).eq('nombre', nombre));
   },
@@ -222,6 +231,7 @@ const DB = {
         nombre           text not null unique,
         tipo             text not null check (tipo in ('ebanista','pintor','ambos')),
         activo           boolean default true,
+        origen           text not null default 'clickup',
         created_at       timestamptz default now()
       );
 
