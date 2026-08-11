@@ -123,7 +123,10 @@ const Asignacion = {
       || CONTRATISTAS_CONOCIDOS.has(nextPersonName.toLowerCase());
     const nextIsContratistaEban = nextStage === 'ebanisteria' && nextIsContratista;
     const nextInicioKey = nextStage ? (nextIsContratistaEban ? 'inicioEbanisteria' : STAGE_INICIO[nextStage]) : null;
-    const canAdvance = nextStage && inicioKey && op[inicioKey] && nextInicioKey && !op[nextInicioKey];
+    // Available regardless of whether the current stage has started — lets the
+    // user skip a stage entirely (e.g. no enchape needed) instead of just
+    // advancing past an already-open one.
+    const canAdvance = nextStage && nextInicioKey && !op[nextInicioKey];
 
     const personOpts = ebanistas.map(n =>
       `<option value="${esc(n)}">${esc(n)}</option>`

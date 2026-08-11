@@ -131,7 +131,10 @@ const Panel = {
           || CONTRATISTAS_CONOCIDOS.has(nextPersonName.toLowerCase());
         const nextIsContratistaEban = nextStage === 'ebanisteria' && nextIsContratista;
         const nextInicioKey = nextStage ? (nextIsContratistaEban ? 'inicioEbanisteria' : STAGE_INICIO[nextStage]) : null;
-        const canAdvance = stageStarted && nextStage && nextInicioKey && !op[nextInicioKey];
+        // Available regardless of whether the current stage has started — lets
+        // the user skip a stage entirely instead of just advancing past an
+        // already-open one.
+        const canAdvance = nextStage && nextInicioKey && !op[nextInicioKey];
 
         // Sub-process labels for this stage
         const subsList   = (a.subprocesos || '').split(',').filter(Boolean);
