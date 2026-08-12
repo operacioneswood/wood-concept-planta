@@ -104,6 +104,9 @@ const Asignacion = {
       || opAssigns.find(a => a.stage && a.stage !== '_' && a.stage !== 'reproceso')?.stage
       || null;
     const hasRepro   = !!op.inicioReproceso && !op.finReproceso;
+    // ClickUp statuses like "Pendiente Chapilla" aren't a production stage —
+    // show them as their own badge instead of folding into the stage pill.
+    const statusInfo = STATUS_DISPLAY[normStr(op.status || '')];
 
     // Determine if the person assigned to the current stage is a contratista
     const stageAssign    = stage ? opAssigns.find(a => a.stage === stage) : null;
@@ -233,9 +236,11 @@ const Asignacion = {
             }
           </div>
           <div class="asign-card-right">
-            ${stage
-              ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>`
-              : '<span class="muted-txt">—</span>'}
+            ${statusInfo
+              ? `<span class="status-badge ${statusInfo.cls}">${esc(statusInfo.label)}</span>`
+              : (stage
+                  ? `<span class="stage-pill-sm" style="color:${STAGE_COLORS[stage]}">${esc(STAGE_LABELS[stage])}</span>`
+                  : '<span class="muted-txt">—</span>')}
             <button class="btn-stage-inicio btn-sm"
               data-op="${esc(op.id)}"${op2Attr}
               data-stage="${esc(stage || '')}"
