@@ -40,6 +40,17 @@ const DB = {
     ));
   },
 
+  // Creates a person only if the name doesn't exist at all — a DB-level
+  // guarantee (ON CONFLICT DO NOTHING) that never touches an existing row,
+  // even a deactivated one. Used by auto-seeding from ClickUp so a stale
+  // local snapshot can never accidentally resurrect someone who was deleted.
+  async seedPersonaIfMissing(nombre, tipo) {
+    return this._q(sb => sb.from('personas').upsert(
+      { nombre, tipo, activo: true },
+      { onConflict: 'nombre', ignoreDuplicates: true }
+    ));
+  },
+
   // Added directly from the web app — not sourced from ClickUp's EBANISTA dropdown,
   // so it's exempt from the auto-prune that hides people removed from ClickUp.
   async addPersonaManual(nombre, tipo) {

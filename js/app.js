@@ -141,7 +141,17 @@ const App = {
   },
 
   // ── Sync ─────────────────────────────────────────────────
-  async _sync({ force = false, silent = false } = {}) {
+  _syncPromise: null,
+
+  // Dedupes overlapping calls (e.g. the 5-min auto-refresh firing while a
+  // manual ↻ is still running) into a single in-flight sync.
+  _sync(opts) {
+    if (this._syncPromise) return this._syncPromise;
+    this._syncPromise = this._doSync(opts).finally(() => { this._syncPromise = null; });
+    return this._syncPromise;
+  },
+
+  async _doSync({ force = false, silent = false } = {}) {
     if (!silent) this._setStatus('Sincronizando...', 'loading');
     try {
       this._data = await PlantaAPI.fetchOPs({
@@ -172,11 +182,11 @@ const App = {
     for (const name of ebanistas) {
       if (existingMap[name]) continue;
       const tipo = CONTRATISTAS_CONOCIDOS.has(normStr(name)) ? 'contratista' : 'ebanista';
-      try { await DB.upsertPersona(name, tipo); changed = true; } catch (e) { console.warn('[App] seed:', name, e.message); }
+      try { await DB.seedPersonaIfMissing(name, tipo); changed = true; } catch (e) { console.warn('[App] seed:', name, e.message); }
     }
     for (const name of pintores) {
       if (existingMap[name]) continue;
-      try { await DB.upsertPersona(name, 'pintor'); changed = true; } catch (e) { console.warn('[App] seed:', name, e.message); }
+      try { await DB.seedPersonaIfMissing(name, 'pintor'); changed = true; } catch (e) { console.warn('[App] seed:', name, e.message); }
     }
 
     if (changed) {

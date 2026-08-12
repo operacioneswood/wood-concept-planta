@@ -273,6 +273,12 @@ const Cronograma = {
             placeholder="Acabado...">
         </td>
         <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
+        <td>
+          <input type="text" class="cron-pintura-comment-inp"
+            data-opid="${esc(op.id)}"
+            placeholder="Notas…"
+            value="${esc(localStorage.getItem('wp_cron_pintura_comment_' + op.id) || '')}">
+        </td>
       </tr>
     `;
   },
@@ -291,6 +297,7 @@ const Cronograma = {
           <th>Fecha Entrega</th>
           <th>Acabado</th>
           <th>Estado</th>
+          <th>Notas</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -724,6 +731,19 @@ ${paintersHtml}
           localStorage.setItem('wp_cron_comment_' + opid, val);
         } else {
           localStorage.removeItem('wp_cron_comment_' + opid);
+        }
+      });
+    });
+
+    root.querySelectorAll('.cron-pintura-comment-inp').forEach(inp => {
+      inp.addEventListener('input', () => {
+        const { opid } = inp.dataset;
+        if (!opid) return;
+        const val = inp.value.trim();
+        if (val) {
+          localStorage.setItem('wp_cron_pintura_comment_' + opid, val);
+        } else {
+          localStorage.removeItem('wp_cron_pintura_comment_' + opid);
         }
       });
     });

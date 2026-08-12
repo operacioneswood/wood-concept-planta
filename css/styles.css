@@ -1698,6 +1698,17 @@ body {
   min-width: 100px;
 }
 .cron-comment-inp:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.cron-pintura-comment-inp {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.78rem;
+  color: var(--text);
+  width: 100%;
+  min-width: 120px;
+}
+.cron-pintura-comment-inp:focus { outline: none; border-color: var(--accent); background: var(--surface); }
 .cron-etapa-pill {
   font-size: 11px; font-weight: 600;
   white-space: nowrap;
