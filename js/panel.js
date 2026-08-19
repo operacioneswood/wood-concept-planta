@@ -3,13 +3,15 @@
 // ─────────────────────────────────────────────────────────────
 
 const Panel = {
-  _fieldIds:   {},
-  _planosMap:  {},
-  _personasMap: {},
+  _fieldIds:       {},
+  _planosMap:      {},
+  _personasMap:    {},
+  _stageStatusMap: {},
 
   render({ ops, ebanistas, dbData, fieldIds }) {
-    this._fieldIds  = fieldIds || {};
-    this._planosMap = App.buildPlanosMap(dbData);
+    this._fieldIds       = fieldIds || {};
+    this._planosMap      = App.buildPlanosMap(dbData);
+    this._stageStatusMap = App.buildStageStatusMap(ops);
     const assignments = App.buildAssignments(dbData);
     const personasMap = App.buildPersonasMap(dbData);
     this._personasMap = personasMap;
@@ -130,7 +132,12 @@ const Panel = {
         const nextIsContratista = this._personasMap[nextPersonName] === 'contratista'
           || CONTRATISTAS_CONOCIDOS.has(nextPersonName.toLowerCase());
         const nextIsContratistaEban = nextStage === 'ebanisteria' && nextIsContratista;
-        const nextInicioKey = nextStage ? (nextIsContratistaEban ? 'inicioEbanisteria' : STAGE_INICIO[nextStage]) : null;
+        // Advancing into Pintura marks the handoff date (Entrega Pintura), not
+        // Inicio Pintura — that one is only set when painting actually begins.
+        const nextInicioKey = nextStage
+          ? (nextIsContratistaEban ? 'inicioEbanisteria' : (nextStage === 'pintura' ? 'entregaPintura' : STAGE_INICIO[nextStage]))
+          : null;
+        const nextStatusRaw = nextStage ? (this._stageStatusMap[nextStage] || null) : null;
         // Available regardless of whether the current stage has started — lets
         // the user skip a stage entirely instead of just advancing past an
         // already-open one.
@@ -142,7 +149,7 @@ const Panel = {
 
         return {
           stageId, stageLabel, stageColor, finKey, fieldId, showCerrar, subsLabels,
-          canAdvance, nextStage, nextInicioKey, nextIsContratista, nextPersonName,
+          canAdvance, nextStage, nextInicioKey, nextStatusRaw, nextIsContratista, nextPersonName,
         };
       });
 
@@ -182,6 +189,7 @@ const Panel = {
             data-op="${esc(op.id)}"${op2Attr}
             data-stage="${esc(s.nextStage)}"
             data-iniciokey="${esc(s.nextInicioKey || '')}"
+            data-newstatus="${esc(s.nextStatusRaw || '')}"
             data-iscontratista="${s.nextIsContratista ? '1' : '0'}"
             data-person="${esc(s.nextPersonName)}"
             title="Avanzar a ${esc(STAGE_LABELS[s.nextStage])} sin cerrar ${esc(s.stageLabel)} — puedes cerrarla después"
@@ -612,6 +620,17 @@ const Panel = {
                 const o = App._data?.ops.find(x => x.id === id);
                 if (o) o.pintor = personName;
               }
+            }
+          }
+          // ⏭ Avanzar also moves the ClickUp task's actual status forward
+          const newStatus = btn.dataset.newstatus;
+          if (newStatus) {
+            await Promise.all(ids.map(id => PlantaAPI.setStatus(id, newStatus).catch(e =>
+              console.warn('[Panel] No se pudo actualizar el estado en ClickUp:', e.message)
+            )));
+            for (const id of ids) {
+              const o = App._data?.ops.find(x => x.id === id);
+              if (o) { o.statusRaw = newStatus; o.status = normStr(newStatus); }
             }
           }
 

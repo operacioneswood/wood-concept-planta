@@ -37,7 +37,7 @@ const PlantaAPI = {
       'inicioCorte','finCorte','inicioChapilla','finChapilla',
       'inicioEnchape','finEnchape','inicioArmado','finArmado',
       'inicioEbanisteria','finEbanisteria',
-      'inicioPintura','finPintura','inicioReproceso','finReproceso',
+      'inicioPintura','finPintura','entregaPintura','inicioReproceso','finReproceso',
       'salidaFabrica','envioFabrica',
     ];
     const out = { ...op };
@@ -176,6 +176,7 @@ const PlantaAPI = {
       finEbanisteria:     find('fin ebanisteria'),
       inicioPintura:      find('inicio pintura'),
       finPintura:         find('fin pintura'),
+      entregaPintura:     find('entrega pintura'),
       inicioReproceso:    find('inicio reproceso'),
       finReproceso:       find('fin reproceso'),
       causaReproceso:     find('causa reproceso'),
@@ -278,6 +279,7 @@ const PlantaAPI = {
       finEbanisteria:      getDate(fieldIds.finEbanisteria),
       inicioPintura:       getDate(fieldIds.inicioPintura),
       finPintura:          getDate(fieldIds.finPintura),
+      entregaPintura:      getDate(fieldIds.entregaPintura),
       inicioReproceso:     getDate(fieldIds.inicioReproceso),
       finReproceso:        getDate(fieldIds.finReproceso),
       causaReproceso:      causa,
@@ -343,6 +345,21 @@ const PlantaAPI = {
     if (!res.ok) {
       const msg = await res.text().catch(() => res.status);
       throw new Error(`ClickUp PUT ${res.status}: ${msg}`);
+    }
+    return res.json();
+  },
+
+  // ── Move a task to a different workflow status ───────────
+  async setStatus(taskId, statusName) {
+    const apiKey = this.getApiKey();
+    const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}`, {
+      method:  'PUT',
+      headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ status: statusName }),
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => res.status);
+      throw new Error(`ClickUp status ${res.status}: ${msg}`);
     }
     return res.json();
   },

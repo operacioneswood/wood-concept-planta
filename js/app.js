@@ -48,6 +48,18 @@ const App = {
     );
   },
 
+  // stage id → the exact raw ClickUp status text used for it in this
+  // workspace (discovered live, since casing/wording isn't hardcoded
+  // the same way across every list — e.g. "en pintura", "en ebanistería").
+  buildStageStatusMap(ops) {
+    const map = {};
+    for (const op of ops || []) {
+      const stage = STATUS_TO_STAGE[op.status];
+      if (stage && !map[stage]) map[stage] = op.statusRaw;
+    }
+    return map;
+  },
+
   // op_id → { partnerId, vinculoId } for OPs linked as one (shared plano)
   buildLinkMap(dbData) {
     const map = {};

@@ -3,16 +3,18 @@
 // ─────────────────────────────────────────────────────────────
 
 const Asignacion = {
-  _collapsed:    new Set(),
-  _ebanistas:    [],
-  _fieldIds:     {},
-  _planosMap:    {},
-  _filterActive: false,
+  _collapsed:      new Set(),
+  _ebanistas:      [],
+  _fieldIds:       {},
+  _planosMap:      {},
+  _stageStatusMap: {},
+  _filterActive:   false,
 
   render({ ops, ebanistas, dbData, fieldIds }) {
-    this._ebanistas = ebanistas;
-    this._fieldIds  = fieldIds || {};
-    this._planosMap = App.buildPlanosMap(dbData);
+    this._ebanistas      = ebanistas;
+    this._fieldIds       = fieldIds || {};
+    this._planosMap      = App.buildPlanosMap(dbData);
+    this._stageStatusMap = App.buildStageStatusMap(ops);
 
     const body = el('asignacion-body');
     if (!ops.length) {
@@ -125,7 +127,12 @@ const Asignacion = {
     const nextIsContratista  = personasMap[nextPersonName] === 'contratista'
       || CONTRATISTAS_CONOCIDOS.has(nextPersonName.toLowerCase());
     const nextIsContratistaEban = nextStage === 'ebanisteria' && nextIsContratista;
-    const nextInicioKey = nextStage ? (nextIsContratistaEban ? 'inicioEbanisteria' : STAGE_INICIO[nextStage]) : null;
+    // Advancing into Pintura marks the handoff date (Entrega Pintura), not
+    // Inicio Pintura — that one is only set when painting actually begins.
+    const nextInicioKey = nextStage
+      ? (nextIsContratistaEban ? 'inicioEbanisteria' : (nextStage === 'pintura' ? 'entregaPintura' : STAGE_INICIO[nextStage]))
+      : null;
+    const nextStatusRaw = nextStage ? (this._stageStatusMap[nextStage] || null) : null;
     // Available regardless of whether the current stage has started — lets the
     // user skip a stage entirely (e.g. no enchape needed) instead of just
     // advancing past an already-open one.
@@ -267,6 +274,7 @@ const Asignacion = {
                 data-op="${esc(op.id)}"${op2Attr}
                 data-stage="${esc(nextStage)}"
                 data-iniciokey="${esc(nextInicioKey || '')}"
+                data-newstatus="${esc(nextStatusRaw || '')}"
                 data-iscontratista="${nextIsContratista ? '1' : '0'}"
                 data-person="${esc(nextPersonName)}"
                 title="Avanzar a ${esc(STAGE_LABELS[nextStage])} sin cerrar ${esc(STAGE_LABELS[stage])} — puedes cerrarla después">
@@ -711,6 +719,19 @@ const Asignacion = {
                 const o = App._data?.ops.find(x => x.id === id);
                 if (o) o.pintor = personName;
               }
+            }
+          }
+          // ⏭ Avanzar also moves the ClickUp task's actual status forward —
+          // Inicio alone never changes status, since the current stage was
+          // already derived from it.
+          const newStatus = btn.dataset.newstatus;
+          if (newStatus) {
+            await Promise.all(ids.map(id => PlantaAPI.setStatus(id, newStatus).catch(e =>
+              console.warn('[Avanzar] No se pudo actualizar el estado en ClickUp:', e.message)
+            )));
+            for (const id of ids) {
+              const o = App._data?.ops.find(x => x.id === id);
+              if (o) { o.statusRaw = newStatus; o.status = normStr(newStatus); }
             }
           }
 
