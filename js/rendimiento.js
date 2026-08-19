@@ -7,18 +7,23 @@
 
 const Rendimiento = {
   _period: 'monthly',
+  _searchQuery: '',
 
   render({ ebanistas, dbData, ops }) {
+    this._lastArgs = { ebanistas, dbData, ops };
     const personasMap    = App.buildPersonasMap(dbData);
-    const historial      = dbData?.historial  || [];
+    const historial       = dbData?.historial   || [];
+    const asignaciones    = dbData?.asignaciones || [];
     const produccion     = dbData?.produccion || [];
 
-    // Period toggle
+    // Period toggle + OP search
     el('rendimiento-controls').innerHTML = `
       <div class="rend-period-toggle">
         <button class="rend-period-btn ${this._period === 'weekly'  ? 'active' : ''}" data-period="weekly">Semanal</button>
         <button class="rend-period-btn ${this._period === 'monthly' ? 'active' : ''}" data-period="monthly">Mensual</button>
       </div>
+      <input type="search" id="rend-op-search" class="rend-search-input"
+        placeholder="Buscar OP por número o nombre..." value="${esc(this._searchQuery)}">
     `;
     el('rendimiento-controls').querySelectorAll('.rend-period-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -26,6 +31,24 @@ const Rendimiento = {
         this.render({ ebanistas, dbData, ops });
       });
     });
+    const searchInp = el('rend-op-search');
+    searchInp.addEventListener('input', () => {
+      this._searchQuery = searchInp.value;
+      this._renderBody({ ebanistas, dbData, ops, personasMap, historial, asignaciones, produccion });
+    });
+    searchInp.focus();
+    searchInp.setSelectionRange(searchInp.value.length, searchInp.value.length);
+
+    this._renderBody({ ebanistas, dbData, ops, personasMap, historial, asignaciones, produccion });
+  },
+
+  _renderBody({ ebanistas, dbData, ops, personasMap, historial, asignaciones, produccion }) {
+    const query = normStr(this._searchQuery.trim());
+    if (query) {
+      el('rendimiento-body').innerHTML = this._renderOpSearch(query, ops || [], historial, asignaciones);
+      this._bindEvents(ops || []);
+      return;
+    }
 
     const now = new Date();
 
@@ -101,6 +124,69 @@ const Rendimiento = {
     `;
 
     this._bindEvents(opsList);
+  },
+
+  // ── Search: who worked on a given OP ──────────────────────────
+  _renderOpSearch(query, ops, historial, asignaciones) {
+    const matches = ops.filter(op =>
+      normStr(op.noOp || '').includes(query) || normStr(op.name || '').includes(query)
+    );
+
+    if (!matches.length) {
+      return `<div class="empty-state"><p>Sin OPs activos que coincidan con "${esc(this._searchQuery)}"</p></div>`;
+    }
+
+    const cards = matches.map(op => {
+      const finished = historial
+        .filter(r => r.op_id === op.id)
+        .slice()
+        .sort((a, b) => (b.fecha_fin || '').localeCompare(a.fecha_fin || ''));
+      const active = asignaciones.filter(a => a.op_id === op.id);
+
+      const activeRows = active.map(a => `
+        <tr class="rh-row-active">
+          <td class="rh-etapa-cell">
+            ${a.persona ? esc(a.persona) : '—'}
+            <span class="rend-log-sub">${esc(STAGE_LABELS[a.etapa] || a.etapa || '')}</span>
+          </td>
+          <td colspan="2"><span class="stage-pill-sm">En curso desde ${esc(a.fecha_asignacion || '')}</span></td>
+          <td>${esc(a.comentario || '')}</td>
+        </tr>
+      `).join('');
+
+      const finishedRows = finished.map(r => `
+        <tr class="${r.es_reproceso ? 'rh-row-repro' : ''}">
+          <td class="rh-etapa-cell">
+            ${esc(r.persona)}
+            <span class="rend-log-sub">${esc(STAGE_LABELS[r.etapa] || r.etapa)}</span>
+            ${(r.subprocesos || '').split(',').filter(Boolean).map(id => `<span class="rend-log-sub">${esc(subproLabel(id))}</span>`).join('')}
+          </td>
+          <td class="muted-txt">${esc(r.fecha_inicio || '—')}</td>
+          <td class="muted-txt">${esc(r.fecha_fin || '—')}</td>
+          <td>${esc(r.comentario || '')}</td>
+        </tr>
+      `).join('');
+
+      const rows = activeRows + finishedRows;
+
+      return `
+        <div class="rend-op-card">
+          <div class="rend-op-hdr">
+            ${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : ''}
+            <span class="rend-op-name">${esc(op.name)}</span>
+            ${op.project ? `<span class="rend-op-proj">${esc(op.project)}</span>` : ''}
+          </div>
+          ${rows ? `
+            <table class="rend-hist-table">
+              <thead><tr><th>Persona / Etapa</th><th>Inicio</th><th>Fin</th><th>Comentario</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          ` : '<p class="muted-txt rend-empty" style="padding:8px 0">Sin personal registrado para esta OP</p>'}
+        </div>
+      `;
+    }).join('');
+
+    return `<div class="rend-op-search-results">${cards}</div>`;
   },
 
   // ── Card: ebanistas ──────────────────────────────────────────

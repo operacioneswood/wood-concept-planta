@@ -489,6 +489,21 @@ const Asignacion = {
               PlantaAPI.clearCache();
             }
           }
+          // Pintura: mirror the assigned person into ClickUp's PINTOR dropdown
+          if (stage === 'pintura') {
+            const pintorOpts = fieldIds?.pintorOpts || {};
+            const optId = pintorOpts[normStr(person)];
+            if (optId && fieldIds?.pintor) {
+              await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldIds.pintor, optId).catch(e =>
+                console.warn('[Asignacion] No se pudo asignar pintor dropdown:', e.message)
+              )));
+              for (const id of ids) {
+                const o = App._data?.ops.find(x => x.id === id);
+                if (o) o.pintor = person;
+              }
+              PlantaAPI.clearCache();
+            }
+          }
         } catch (e) {
           console.error('[Asignacion] save failed:', e.message);
         }
@@ -681,6 +696,21 @@ const Asignacion = {
               await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldIds.ebanista, optId).catch(e =>
                 console.warn('[Inicio] No se pudo asignar ebanista dropdown:', e.message)
               )));
+            }
+          }
+          // Starting/advancing into Pintura with a known painter — fill the Pintor dropdown
+          if (stage === 'pintura') {
+            const personName = btn.dataset.person || '';
+            const pintorOpts  = fieldIds?.pintorOpts || {};
+            const optId = pintorOpts[normStr(personName)];
+            if (optId && fieldIds?.pintor) {
+              await Promise.all(ids.map(id => PlantaAPI.setField(id, fieldIds.pintor, optId).catch(e =>
+                console.warn('[Inicio] No se pudo asignar pintor dropdown:', e.message)
+              )));
+              for (const id of ids) {
+                const o = App._data?.ops.find(x => x.id === id);
+                if (o) o.pintor = personName;
+              }
             }
           }
 

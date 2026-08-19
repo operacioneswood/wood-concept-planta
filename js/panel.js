@@ -599,6 +599,21 @@ const Panel = {
               )));
             }
           }
+          // Advancing into Pintura with a known painter — fill the Pintor dropdown
+          if (stage === 'pintura') {
+            const personName = btn.dataset.person || '';
+            const pintorOpts  = this._fieldIds?.pintorOpts || {};
+            const optId = pintorOpts[normStr(personName)];
+            if (optId && this._fieldIds?.pintor) {
+              await Promise.all(ids.map(id => PlantaAPI.setField(id, this._fieldIds.pintor, optId).catch(e =>
+                console.warn('[Panel] No se pudo asignar pintor dropdown:', e.message)
+              )));
+              for (const id of ids) {
+                const o = App._data?.ops.find(x => x.id === id);
+                if (o) o.pintor = personName;
+              }
+            }
+          }
 
           PlantaAPI.clearCache();
           App.renderPanel();

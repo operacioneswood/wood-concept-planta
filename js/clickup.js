@@ -125,6 +125,7 @@ const PlantaAPI = {
     const ebanistasSet = new Set();
     const ebanistaOpts = {};  // normStr(name) → ClickUp option UUID
     const pintoresSet  = new Set();
+    const pintorOpts   = {};  // normStr(name) → ClickUp option UUID
 
     for (const t of rawTasks) {
       for (const cf of (t.custom_fields || [])) {
@@ -144,7 +145,10 @@ const PlantaAPI = {
         // Collect pintor dropdown options
         if (norm.includes('pintor') && cf.type === 'drop_down') {
           for (const opt of (cf.type_config?.options || [])) {
-            if (opt.name) pintoresSet.add(opt.name);
+            if (opt.name) {
+              pintoresSet.add(opt.name);
+              pintorOpts[normStr(opt.name)] = opt.id;
+            }
           }
         }
       }
@@ -183,6 +187,7 @@ const PlantaAPI = {
       cliente:            find('cliente'),
       acabado:            fieldMap['acabado']?.id || null,   // exact match — avoids 'inicio acabado' date fields
       pintor:             find('pintor'),
+      pintorOpts,
       extra:              find('extra'),
     };
     console.log('[CU] _detectFields fieldIds:', JSON.stringify(fieldIds));
