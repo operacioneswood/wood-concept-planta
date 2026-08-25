@@ -1619,6 +1619,13 @@ body {
 .cron-date-inp:hover { border-color: var(--accent); }
 .cron-date-inp:focus { outline: 2px solid var(--accent); border-color: transparent; }
 
+.cron-queue-date {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 0.8rem; font-weight: 600; color: var(--accent);
+  background: var(--accent-bg); border-radius: 6px;
+  padding: 4px 8px; white-space: nowrap; cursor: help;
+}
+
 .cron-text-inp {
   background: transparent;
   border: 1px solid var(--border);

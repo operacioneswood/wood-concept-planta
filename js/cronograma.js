@@ -13,7 +13,59 @@ const Cronograma = {
     this._ops      = ops      || [];
     this._fieldIds = fieldIds || {};
     this._dbData   = dbData;
+    this._queueMap = this._computeQueueSchedule();
     this._draw();
+  },
+
+  // ── Priority queue for Fecha límite ─────────────────────────
+  // Pending OPs (production not yet started) are queued by project priority,
+  // then envío a fábrica as a tiebreaker, and assigned to whichever of the
+  // parallel worker "slots" frees up earliest — a high-priority arrival
+  // jumps the line and pushes everyone behind it out automatically.
+  // Recomputed fresh on every render, nothing saved.
+  _computeQueueSchedule() {
+    const priority    = App.buildPriorities(this._dbData);
+    const priorityIdx = proj => { const i = priority.indexOf(proj); return i === -1 ? 999 : i; };
+
+    const withBoth = this._ops.filter(op => op.salidaFabrica && op.envioFabrica);
+    const avgMs = withBoth.length
+      ? withBoth.reduce((sum, op) => sum + (op.salidaFabrica - op.envioFabrica), 0) / withBoth.length
+      : QUEUE_DEFAULT_DURATION_DAYS * 86400000;
+
+    // Parallel capacity — how many ebanistas + contratistas can be working
+    // fabrication OPs at once, not a single serial line.
+    const personasMap  = App.buildPersonasMap(this._dbData);
+    const workerCount  = Math.max(1, Object.values(personasMap)
+      .filter(t => t === 'ebanista' || t === 'contratista').length);
+
+    const pending = this._ops
+      .filter(op => !op.inicioCorte)
+      .sort((a, b) => {
+        const pa = priorityIdx(a.project || ''), pb = priorityIdx(b.project || '');
+        if (pa !== pb) return pa - pb;
+        const ea = a.envioFabrica ? a.envioFabrica.getTime() : Infinity;
+        const eb = b.envioFabrica ? b.envioFabrica.getTime() : Infinity;
+        return ea - eb;
+      });
+
+    const slots = new Array(workerCount).fill(Date.now());
+    const map = {};
+    for (const op of pending) {
+      const arrival = op.envioFabrica ? op.envioFabrica.getTime() : Date.now();
+      let slotIdx = 0;
+      for (let i = 1; i < slots.length; i++) if (slots[i] < slots[slotIdx]) slotIdx = i;
+      const inicio = Math.max(slots[slotIdx], arrival);
+      const limite = inicio + avgMs;
+      map[op.id] = new Date(limite);
+      slots[slotIdx] = limite;
+    }
+    return map;
+  },
+
+  // The date actually used for display/sorting/urgency in Fábrica — the
+  // computed queue date for pending OPs, or the real ClickUp date otherwise.
+  _effectiveDate(op) {
+    return this._queueMap[op.id] || op.salidaFabrica;
   },
 
   _draw() {
@@ -78,9 +130,10 @@ const Cronograma = {
     }
 
     const sorted = Object.entries(byProject).sort(([, a], [, b]) => {
-      const earliest = arr => arr.reduce((min, op) =>
-        op.salidaFabrica && (!min || op.salidaFabrica < min) ? op.salidaFabrica : min
-      , null);
+      const earliest = arr => arr.reduce((min, op) => {
+        const d = this._effectiveDate(op);
+        return d && (!min || d < min) ? d : min;
+      }, null);
       const da = earliest(a), db = earliest(b);
       if (!da && !db) return 0;
       if (!da) return 1;
@@ -95,10 +148,11 @@ const Cronograma = {
       const urgHtml = this._urgBadgesHtml(overdue, urgent);
 
       const opsorted = [...ops].sort((a, b) => {
-        if (!a.salidaFabrica && !b.salidaFabrica) return 0;
-        if (!a.salidaFabrica) return 1;
-        if (!b.salidaFabrica) return -1;
-        return a.salidaFabrica - b.salidaFabrica;
+        const da = this._effectiveDate(a), db = this._effectiveDate(b);
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return da - db;
       });
 
       const rowGroups = App.groupLinkedOps(opsorted, this._dbData);
@@ -107,7 +161,9 @@ const Cronograma = {
         const op = groupOps[0];
         const linkedOp = groupOps[1] || null;
         const opid2Attr = linkedOp ? ` data-opid2="${esc(linkedOp.id)}"` : '';
-        const st = this._statusInfo(op.salidaFabrica);
+        const effDate   = this._effectiveDate(op);
+        const isQueued  = !op.inicioCorte && !!this._queueMap[op.id];
+        const st = this._statusInfo(effDate);
         const savedComment = localStorage.getItem('wp_cron_comment_' + op.id) || '';
         return `
           <tr>
@@ -119,12 +175,14 @@ const Cronograma = {
             <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
             <td class="cron-fecha-lbl cron-envio-lbl">${op.envioFabrica ? this._fmtShort(op.envioFabrica) : '<span class="cron-faint">—</span>'}</td>
             <td>
-              <input type="date" class="cron-date-inp"
-                data-opid="${esc(op.id)}"${opid2Attr}
-                data-fieldkey="salidaFabrica"
-                value="${this._toInputVal(op.salidaFabrica)}">
+              ${isQueued
+                ? `<span class="cron-queue-date" title="Calculado automáticamente por prioridad de proyecto y capacidad — se recalcula solo">🔄 ${this._fmtShort(effDate)}</span>`
+                : `<input type="date" class="cron-date-inp"
+                    data-opid="${esc(op.id)}"${opid2Attr}
+                    data-fieldkey="salidaFabrica"
+                    value="${this._toInputVal(op.salidaFabrica)}">`}
             </td>
-            <td class="cron-fecha-lbl">${op.salidaFabrica ? this._fmtShort(op.salidaFabrica) : '<span class="cron-faint">—</span>'}</td>
+            <td class="cron-fecha-lbl">${effDate ? this._fmtShort(effDate) : '<span class="cron-faint">—</span>'}</td>
             <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
             <td><input type="text" class="cron-comment-inp" data-opid="${esc(op.id)}" placeholder="Notas…" value="${esc(savedComment)}"></td>
           </tr>
@@ -164,10 +222,11 @@ const Cronograma = {
     const fabOps = this._ops
       .filter(op => op.status !== 'en pintura' && op.status !== 'pendiente por obra')
       .sort((a, b) => {
-        if (!a.salidaFabrica && !b.salidaFabrica) return 0;
-        if (!a.salidaFabrica) return 1;
-        if (!b.salidaFabrica) return -1;
-        return a.salidaFabrica - b.salidaFabrica;
+        const da = this._effectiveDate(a), db = this._effectiveDate(b);
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return da - db;
       });
 
     if (!fabOps.length) return '<div class="cron-empty">Sin OPs en fábrica.</div>';
@@ -180,7 +239,9 @@ const Cronograma = {
       const op = groupOps[0];
       const linkedOp = groupOps[1] || null;
       const opid2Attr = linkedOp ? ` data-opid2="${esc(linkedOp.id)}"` : '';
-      const st = this._statusInfo(op.salidaFabrica);
+      const effDate  = this._effectiveDate(op);
+      const isQueued = !op.inicioCorte && !!this._queueMap[op.id];
+      const st = this._statusInfo(effDate);
       return `
         <tr>
           <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
@@ -193,12 +254,14 @@ const Cronograma = {
           <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
           <td class="cron-fecha-lbl cron-envio-lbl">${op.envioFabrica ? this._fmtShort(op.envioFabrica) : '<span class="cron-faint">—</span>'}</td>
           <td>
-            <input type="date" class="cron-date-inp"
-              data-opid="${esc(op.id)}"${opid2Attr}
-              data-fieldkey="salidaFabrica"
-              value="${this._toInputVal(op.salidaFabrica)}">
+            ${isQueued
+              ? `<span class="cron-queue-date" title="Calculado automáticamente por prioridad de proyecto y capacidad — se recalcula solo">🔄 ${this._fmtShort(effDate)}</span>`
+              : `<input type="date" class="cron-date-inp"
+                  data-opid="${esc(op.id)}"${opid2Attr}
+                  data-fieldkey="salidaFabrica"
+                  value="${this._toInputVal(op.salidaFabrica)}">`}
           </td>
-          <td class="cron-fecha-lbl">${op.salidaFabrica ? this._fmtShort(op.salidaFabrica) : '<span class="cron-faint">—</span>'}</td>
+          <td class="cron-fecha-lbl">${effDate ? this._fmtShort(effDate) : '<span class="cron-faint">—</span>'}</td>
         </tr>
       `;
     }).join('');
@@ -624,8 +687,9 @@ ${paintersHtml}
     const today = new Date(); today.setHours(0, 0, 0, 0);
     let overdue = 0, urgent = 0;
     for (const op of ops) {
-      if (!op.salidaFabrica) continue;
-      const diff = Math.ceil((op.salidaFabrica - today) / 86400000);
+      const d = this._effectiveDate(op);
+      if (!d) continue;
+      const diff = Math.ceil((d - today) / 86400000);
       if (diff < 0) overdue++;
       else if (diff <= 7) urgent++;
     }

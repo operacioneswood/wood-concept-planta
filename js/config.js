@@ -31,6 +31,12 @@ const STATUS_DISPLAY = {
   'pendiente chapilla':    { label: 'Pend. Chapilla',       cls: 'sb-chapilla' },
 };
 
+// ── Cronograma queue model ─────────────────────────────────────
+// Fallback duration (envío a fábrica → fecha límite) used only when there
+// isn't yet enough real data to compute a live average. Once enough OPs
+// have both dates, the real average takes over automatically.
+const QUEUE_DEFAULT_DURATION_DAYS = 85;
+
 // ── Performance targets per role ─────────────────────────────
 const TARGETS = {
   ebanista:   { weekly: 5,  monthly: 20 },
