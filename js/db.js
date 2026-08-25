@@ -216,6 +216,21 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
+  // CRON_SEEN_OPS  (which OPs the priority-push logic has already seen —
+  // shared across every device so a new arrival only triggers one push)
+  // ════════════════════════════════════════════════════════
+  async getSeenOpIds() {
+    const rows = await this._q(sb => sb.from('cron_seen_ops').select('op_id'));
+    return new Set((rows || []).map(r => r.op_id));
+  },
+
+  async markOpsSeen(opIds) {
+    if (!opIds.length) return;
+    const rows = opIds.map(op_id => ({ op_id }));
+    return this._q(sb => sb.from('cron_seen_ops').upsert(rows, { onConflict: 'op_id', ignoreDuplicates: true }));
+  },
+
+  // ════════════════════════════════════════════════════════
   // VINCULOS  (2 OPs sharing one physical plano — linked as one)
   // ════════════════════════════════════════════════════════
   async getVinculos() {
@@ -288,6 +303,11 @@ const DB = {
         proyecto_id      text not null unique,
         proyecto_nombre  text,
         orden            integer not null
+      );
+
+      create table if not exists cron_seen_ops (
+        op_id            text primary key,
+        seen_at          timestamptz not null default now()
       );
 
       create table if not exists op_vinculos (

@@ -7,6 +7,7 @@ const App = {
   _dbData:           null,   // Supabase data: { asignaciones, prioridades, produccion, personas }
   _refreshTimer:     null,
   _REFRESH_INTERVAL: 5 * 60 * 1000,
+  _lastPriorityShifts: [],
 
   // ── DB data helpers (used by all tabs) ───────────────────
   buildAssignments(dbData) {
@@ -178,12 +179,66 @@ const App = {
       await this._pruneStalePersonas(this._data.ebanistas || [], this._data.pintores || []);
       // Auto-historial cross-reference
       await Sync.runAutoHistorial(this._data.ops || [], this._dbData.asignaciones);
+      // Push out lower-priority fecha límites that now conflict with a
+      // higher-priority OP's date (writes the new dates to ClickUp for real)
+      this._lastPriorityShifts = await this._reconcilePriorityDates();
       this._renderAll();
       this._setStatus(this._syncLabel(), 'ok');
     } catch (e) {
       console.error('[App] Sync error:', e);
       this._setStatus('Error: ' + e.message, 'error');
     }
+  },
+
+  // When a brand-new OP shows up in the #1 priority project, every OP still
+  // sitting at the generic "Fábrica" status (no specific stage yet) gets
+  // pushed out by a flat PRIORITY_PUSH_DAYS — once, uniformly, no per-item
+  // comparisons or chaining. A real, permanent write to ClickUp's due date.
+  // "New" is tracked in Supabase (shared across every device/tab) so it
+  // fires exactly once per arrival; the very first sync just records the
+  // current OPs as a baseline without shifting anything.
+  async _reconcilePriorityDates() {
+    if (!this._data?.ops?.length) return [];
+
+    const priority    = this.buildPriorities(this._dbData);
+    const topProject  = priority[0] || null;
+
+    let seenIds;
+    try {
+      seenIds = await DB.getSeenOpIds();
+    } catch (e) {
+      console.warn('[App] cron_seen_ops table missing? Skipping priority push:', e.message);
+      return [];
+    }
+
+    const isFirstRun = seenIds.size === 0;
+    const unseenIds  = this._data.ops.map(op => op.id).filter(id => !seenIds.has(id));
+    if (unseenIds.length) {
+      await DB.markOpsSeen(unseenIds).catch(e => console.warn('[App] markOpsSeen failed:', e.message));
+    }
+
+    if (isFirstRun || !topProject) return [];
+
+    const hasNewTopProjectOp = this._data.ops.some(op =>
+      op.project === topProject && !seenIds.has(op.id)
+    );
+    if (!hasNewTopProjectOp) return [];
+
+    const pushMs = PRIORITY_PUSH_DAYS * 86400000;
+    const shifts = this._data.ops
+      .filter(op => op.status === 'fabrica' && op.salidaFabrica)
+      .map(op => ({ op, oldDate: op.salidaFabrica, newDate: new Date(op.salidaFabrica.getTime() + pushMs) }));
+
+    for (const { op, newDate } of shifts) {
+      try {
+        await PlantaAPI.setDueDate(op.id, newDate.getTime());
+        op.salidaFabrica = newDate;
+      } catch (e) {
+        console.warn('[App] priority push failed for', op.noOp, e.message);
+      }
+    }
+    if (shifts.length) PlantaAPI.clearCache();
+    return shifts;
   },
 
   // Seed personas table with names from ClickUp EBANISTA dropdown (non-destructive)

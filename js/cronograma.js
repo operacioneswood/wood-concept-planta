@@ -13,65 +13,38 @@ const Cronograma = {
     this._ops      = ops      || [];
     this._fieldIds = fieldIds || {};
     this._dbData   = dbData;
-    this._queueMap = this._computeQueueSchedule();
     this._draw();
   },
 
-  // ── Priority queue for Fecha límite ─────────────────────────
-  // Pending OPs (production not yet started) are queued by project priority,
-  // then envío a fábrica as a tiebreaker, and assigned to whichever of the
-  // parallel worker "slots" frees up earliest — a high-priority arrival
-  // jumps the line and pushes everyone behind it out automatically.
-  // Recomputed fresh on every render, nothing saved.
-  _computeQueueSchedule() {
-    const priority    = App.buildPriorities(this._dbData);
-    const priorityIdx = proj => { const i = priority.indexOf(proj); return i === -1 ? 999 : i; };
-
-    const withBoth = this._ops.filter(op => op.salidaFabrica && op.envioFabrica);
-    const avgMs = withBoth.length
-      ? withBoth.reduce((sum, op) => sum + (op.salidaFabrica - op.envioFabrica), 0) / withBoth.length
-      : QUEUE_DEFAULT_DURATION_DAYS * 86400000;
-
-    // Parallel capacity — how many ebanistas + contratistas can be working
-    // fabrication OPs at once, not a single serial line.
-    const personasMap  = App.buildPersonasMap(this._dbData);
-    const workerCount  = Math.max(1, Object.values(personasMap)
-      .filter(t => t === 'ebanista' || t === 'contratista').length);
-
-    const pending = this._ops
-      .filter(op => !op.inicioCorte)
-      .sort((a, b) => {
-        const pa = priorityIdx(a.project || ''), pb = priorityIdx(b.project || '');
-        if (pa !== pb) return pa - pb;
-        const ea = a.envioFabrica ? a.envioFabrica.getTime() : Infinity;
-        const eb = b.envioFabrica ? b.envioFabrica.getTime() : Infinity;
-        return ea - eb;
-      });
-
-    const slots = new Array(workerCount).fill(Date.now());
-    const map = {};
-    for (const op of pending) {
-      const arrival = op.envioFabrica ? op.envioFabrica.getTime() : Date.now();
-      let slotIdx = 0;
-      for (let i = 1; i < slots.length; i++) if (slots[i] < slots[slotIdx]) slotIdx = i;
-      const inicio = Math.max(slots[slotIdx], arrival);
-      const limite = inicio + avgMs;
-      map[op.id] = new Date(limite);
-      slots[slotIdx] = limite;
-    }
-    return map;
+  // The date used for display/sorting/urgency in Fábrica — always ClickUp's
+  // real due date. (Priority-driven pushes are applied for real to this
+  // field during sync — see App._reconcilePriorityDates — not computed here.)
+  _effectiveDate(op) {
+    return op.salidaFabrica;
   },
 
-  // The date actually used for display/sorting/urgency in Fábrica — the
-  // computed queue date for pending OPs, or the real ClickUp date otherwise.
-  _effectiveDate(op) {
-    return this._queueMap[op.id] || op.salidaFabrica;
+  _shiftsBannerHtml() {
+    const shifts = App._lastPriorityShifts || [];
+    if (!shifts.length) return '';
+    const rows = shifts.map(s => `
+      <li>${esc(s.op.noOp || s.op.name)} — ${this._fmtShort(s.oldDate)} → <strong>${this._fmtShort(s.newDate)}</strong></li>
+    `).join('');
+    return `
+      <div class="cron-shift-banner">
+        <div class="cron-shift-hdr">
+          <span>📌 ${shifts.length} fecha${shifts.length !== 1 ? 's' : ''} límite se corrió por prioridad de proyecto</span>
+          <button class="cron-shift-dismiss" id="btn-dismiss-shifts">✕</button>
+        </div>
+        <ul class="cron-shift-list">${rows}</ul>
+      </div>
+    `;
   },
 
   _draw() {
     const wrap = el('cronograma-container');
     if (!wrap) return;
     wrap.innerHTML = `
+      ${this._shiftsBannerHtml()}
       <div class="cron-subtabs">
         <button class="cron-subtab ${this._sub === 'fabrica' ? 'active' : ''}" data-sub="fabrica">🏭 Fábrica</button>
         <button class="cron-subtab ${this._sub === 'pintura' ? 'active' : ''}" data-sub="pintura">🎨 Pintura</button>
@@ -80,6 +53,10 @@ const Cronograma = {
         ${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}
       </div>
     `;
+    wrap.querySelector('#btn-dismiss-shifts')?.addEventListener('click', () => {
+      App._lastPriorityShifts = [];
+      this._draw();
+    });
     wrap.querySelectorAll('.cron-subtab').forEach(btn => {
       btn.addEventListener('click', () => {
         this._sub = btn.dataset.sub;
@@ -162,7 +139,6 @@ const Cronograma = {
         const linkedOp = groupOps[1] || null;
         const opid2Attr = linkedOp ? ` data-opid2="${esc(linkedOp.id)}"` : '';
         const effDate   = this._effectiveDate(op);
-        const isQueued  = !op.inicioCorte && !!this._queueMap[op.id];
         const st = this._statusInfo(effDate);
         const savedComment = localStorage.getItem('wp_cron_comment_' + op.id) || '';
         return `
@@ -175,12 +151,10 @@ const Cronograma = {
             <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
             <td class="cron-fecha-lbl cron-envio-lbl">${op.envioFabrica ? this._fmtShort(op.envioFabrica) : '<span class="cron-faint">—</span>'}</td>
             <td>
-              ${isQueued
-                ? `<span class="cron-queue-date" title="Calculado automáticamente por prioridad de proyecto y capacidad — se recalcula solo">🔄 ${this._fmtShort(effDate)}</span>`
-                : `<input type="date" class="cron-date-inp"
-                    data-opid="${esc(op.id)}"${opid2Attr}
-                    data-fieldkey="salidaFabrica"
-                    value="${this._toInputVal(op.salidaFabrica)}">`}
+              <input type="date" class="cron-date-inp"
+                data-opid="${esc(op.id)}"${opid2Attr}
+                data-fieldkey="salidaFabrica"
+                value="${this._toInputVal(op.salidaFabrica)}">
             </td>
             <td class="cron-fecha-lbl">${effDate ? this._fmtShort(effDate) : '<span class="cron-faint">—</span>'}</td>
             <td><span class="cron-badge ${st.cls}">${st.label}</span></td>
@@ -240,7 +214,6 @@ const Cronograma = {
       const linkedOp = groupOps[1] || null;
       const opid2Attr = linkedOp ? ` data-opid2="${esc(linkedOp.id)}"` : '';
       const effDate  = this._effectiveDate(op);
-      const isQueued = !op.inicioCorte && !!this._queueMap[op.id];
       const st = this._statusInfo(effDate);
       return `
         <tr>
@@ -254,12 +227,10 @@ const Cronograma = {
           <td class="cron-etapa-cell">${this._opStatusBadge(op)}</td>
           <td class="cron-fecha-lbl cron-envio-lbl">${op.envioFabrica ? this._fmtShort(op.envioFabrica) : '<span class="cron-faint">—</span>'}</td>
           <td>
-            ${isQueued
-              ? `<span class="cron-queue-date" title="Calculado automáticamente por prioridad de proyecto y capacidad — se recalcula solo">🔄 ${this._fmtShort(effDate)}</span>`
-              : `<input type="date" class="cron-date-inp"
-                  data-opid="${esc(op.id)}"${opid2Attr}
-                  data-fieldkey="salidaFabrica"
-                  value="${this._toInputVal(op.salidaFabrica)}">`}
+            <input type="date" class="cron-date-inp"
+              data-opid="${esc(op.id)}"${opid2Attr}
+              data-fieldkey="salidaFabrica"
+              value="${this._toInputVal(op.salidaFabrica)}">
           </td>
           <td class="cron-fecha-lbl">${effDate ? this._fmtShort(effDate) : '<span class="cron-faint">—</span>'}</td>
         </tr>

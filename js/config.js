@@ -31,11 +31,12 @@ const STATUS_DISPLAY = {
   'pendiente chapilla':    { label: 'Pend. Chapilla',       cls: 'sb-chapilla' },
 };
 
-// ── Cronograma queue model ─────────────────────────────────────
-// Fallback duration (envío a fábrica → fecha límite) used only when there
-// isn't yet enough real data to compute a live average. Once enough OPs
-// have both dates, the real average takes over automatically.
-const QUEUE_DEFAULT_DURATION_DAYS = 85;
+// ── Priority-based fecha límite push ────────────────────────────
+// When a brand-new OP shows up in the #1 priority project (the top of the
+// list in Tablero), every OP still sitting at the generic "Fábrica" status
+// gets its fecha límite pushed out by this many days — a flat, one-time,
+// permanent change written back to ClickUp's due date. Adjust to taste.
+const PRIORITY_PUSH_DAYS = 5;
 
 // ── Performance targets per role ─────────────────────────────
 const TARGETS = {
