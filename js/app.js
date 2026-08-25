@@ -190,13 +190,33 @@ const App = {
     }
   },
 
-  // When a brand-new OP shows up in the #1 priority project, every OP still
+  // Real historical pace: median days a single OP actually spends in
+  // ebanistería (fecha_inicio → fecha_fin of that same OP), from Supabase
+  // historial. Uses the median (not average) because completions are often
+  // logged in batches on the same day, which would make a gap-between-
+  // completions or mean-duration measure look artificially fast. Self-
+  // corrects as more data comes in. Falls back to the config constant
+  // until there's enough history to compute it (2+ OPs).
+  _computeDaysPerOp() {
+    const rows = (this._dbData?.historial || [])
+      .filter(h => h.etapa === 'ebanisteria' && h.fecha_inicio && h.fecha_fin && !h.es_reproceso);
+    const durations = rows
+      .map(h => (new Date(h.fecha_fin) - new Date(h.fecha_inicio)) / 86400000)
+      .filter(d => d > 0)
+      .sort((a, b) => a - b);
+    if (durations.length < 2) return PRIORITY_PUSH_DAYS;
+    const mid = Math.floor(durations.length / 2);
+    return durations.length % 2 ? durations[mid] : (durations[mid - 1] + durations[mid]) / 2;
+  },
+
+  // When brand-new OPs show up in the #1 priority project, every OP still
   // sitting at the generic "Fábrica" status (no specific stage yet) gets
-  // pushed out by a flat PRIORITY_PUSH_DAYS — once, uniformly, no per-item
-  // comparisons or chaining. A real, permanent write to ClickUp's due date.
-  // "New" is tracked in Supabase (shared across every device/tab) so it
-  // fires exactly once per arrival; the very first sync just records the
-  // current OPs as a baseline without shifting anything.
+  // pushed out by (# of new OPs) × (real days-per-OP pace) — once,
+  // uniformly, no per-item comparisons or chaining. A real, permanent
+  // write to ClickUp's due date. "New" is tracked in Supabase (shared
+  // across every device/tab) so it fires exactly once per arrival; the
+  // very first sync just records the current OPs as a baseline without
+  // shifting anything.
   async _reconcilePriorityDates() {
     if (!this._data?.ops?.length) return [];
 
@@ -219,12 +239,12 @@ const App = {
 
     if (isFirstRun || !topProject) return [];
 
-    const hasNewTopProjectOp = this._data.ops.some(op =>
-      op.project === topProject && !seenIds.has(op.id)
-    );
-    if (!hasNewTopProjectOp) return [];
+    const newTopProjectCount = this._data.ops
+      .filter(op => op.project === topProject && !seenIds.has(op.id)).length;
+    if (!newTopProjectCount) return [];
 
-    const pushMs = PRIORITY_PUSH_DAYS * 86400000;
+    const pushDays = newTopProjectCount * this._computeDaysPerOp();
+    const pushMs   = pushDays * 86400000;
     const shifts = this._data.ops
       .filter(op => op.status === 'fabrica' && op.salidaFabrica)
       .map(op => ({ op, oldDate: op.salidaFabrica, newDate: new Date(op.salidaFabrica.getTime() + pushMs) }));

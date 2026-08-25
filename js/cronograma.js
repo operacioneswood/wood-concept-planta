@@ -26,13 +26,14 @@ const Cronograma = {
   _shiftsBannerHtml() {
     const shifts = App._lastPriorityShifts || [];
     if (!shifts.length) return '';
+    const pushDays = Math.round((shifts[0].newDate - shifts[0].oldDate) / 86400000 * 10) / 10;
     const rows = shifts.map(s => `
       <li>${esc(s.op.noOp || s.op.name)} — ${this._fmtShort(s.oldDate)} → <strong>${this._fmtShort(s.newDate)}</strong></li>
     `).join('');
     return `
       <div class="cron-shift-banner">
         <div class="cron-shift-hdr">
-          <span>📌 ${shifts.length} fecha${shifts.length !== 1 ? 's' : ''} límite se corrió por prioridad de proyecto</span>
+          <span>📌 ${shifts.length} fecha${shifts.length !== 1 ? 's' : ''} límite se corrió ${pushDays} día${pushDays !== 1 ? 's' : ''} por una OP nueva en el proyecto de mayor prioridad</span>
           <button class="cron-shift-dismiss" id="btn-dismiss-shifts">✕</button>
         </div>
         <ul class="cron-shift-list">${rows}</ul>
