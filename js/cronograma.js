@@ -33,7 +33,7 @@ const Cronograma = {
     return `
       <div class="cron-shift-banner">
         <div class="cron-shift-hdr">
-          <span>📌 ${shifts.length} fecha${shifts.length !== 1 ? 's' : ''} límite se corrió ${pushDays} día${pushDays !== 1 ? 's' : ''} por una OP nueva en el proyecto de mayor prioridad</span>
+          <span>📌 ${shifts.length} fecha${shifts.length !== 1 ? 's' : ''} límite se corrió ${pushDays} día${pushDays !== 1 ? 's' : ''} por una OP nueva en ${App._lastPriorityShiftProject ? esc(App._lastPriorityShiftProject) : 'un proyecto con prioridad'}</span>
           <button class="cron-shift-dismiss" id="btn-dismiss-shifts">✕</button>
         </div>
         <ul class="cron-shift-list">${rows}</ul>

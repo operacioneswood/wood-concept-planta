@@ -231,13 +231,13 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
-  // CRON_PENDING_SHIFT  (one accumulating fecha-límite proposal awaiting
-  // manual approval — shared across every device)
+  // CRON_PENDING_SHIFT  (one accumulating fecha-límite proposal per
+  // triggering project, awaiting manual approval — shared across every
+  // device)
   // ════════════════════════════════════════════════════════
-  async getPendingShift() {
-    const rows = await this._q(sb => sb.from('cron_pending_shift')
-      .select('*').eq('status', 'pending').order('created_at', { ascending: false }).limit(1));
-    return (rows && rows[0]) || null;
+  async getPendingShifts() {
+    return this._q(sb => sb.from('cron_pending_shift')
+      .select('*').eq('status', 'pending').order('created_at', { ascending: true }));
   },
 
   async upsertPendingShift({ id, top_project, new_op_count, push_days }) {

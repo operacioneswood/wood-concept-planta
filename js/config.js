@@ -32,12 +32,13 @@ const STATUS_DISPLAY = {
 };
 
 // ── Priority-based fecha límite push ────────────────────────────
-// When brand-new OPs show up in the #1 priority project (the top of the
-// list in Tablero), every OP still sitting at the generic "Fábrica" status
-// gets its fecha límite pushed out by (# of new OPs) × the real median
-// days-per-OP duration in ebanistería — computed live from historial. This
-// constant is only the fallback used before there's enough history to
-// compute that duration.
+// When brand-new OPs show up in a ranked project (Tablero priority list),
+// a pending proposal is created to push out the fecha límite of every
+// "Fábrica" OP belonging to a project ranked *after* it — by (# of new
+// OPs) × the real median days-per-OP duration in ebanistería, computed
+// live from historial. Requires manual approval from the global banner
+// before anything is written to ClickUp. This constant is only the
+// fallback used before there's enough history to compute that duration.
 const PRIORITY_PUSH_DAYS = 5;
 
 // ── Performance targets per role ─────────────────────────────
