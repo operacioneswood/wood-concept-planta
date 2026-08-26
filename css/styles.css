@@ -121,6 +121,24 @@ body {
 
 .app-body { padding-top: var(--nav-h); min-height: 100vh; }
 
+/* ── Global pending-shift banner (visible above every tab) ── */
+#global-shift-banner { display: none; }
+#global-shift-banner.visible {
+  display: block;
+  margin-top: var(--nav-h);
+  background: var(--accent-bg);
+  border-bottom: 1px solid var(--accent);
+  padding: 10px 20px;
+}
+body.has-pending-shift .app-body { padding-top: 0; }
+.gsb-inner {
+  display: flex; align-items: center; gap: 12px;
+  max-width: 1400px; margin: 0 auto;
+}
+.gsb-icon { font-size: 1rem; flex-shrink: 0; }
+.gsb-text { flex: 1; font-size: 0.85rem; color: var(--accent); }
+.gsb-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
 /* ════════════════════════════════════════════════════════════
    TAB SCREENS
    ════════════════════════════════════════════════════════════ */
@@ -1144,6 +1162,8 @@ body {
 /* ── Nav ── */
 .tablet .app-nav { height: 58px; }
 .tablet .app-body { padding-top: 58px; }
+.tablet #global-shift-banner.visible { margin-top: 58px; }
+.tablet.has-pending-shift .app-body { padding-top: 0; }
 .tablet .brand-name,
 .tablet .brand-sep,
 .tablet .brand-sub { display: none; }

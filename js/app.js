@@ -8,6 +8,7 @@ const App = {
   _refreshTimer:     null,
   _REFRESH_INTERVAL: 5 * 60 * 1000,
   _lastPriorityShifts: [],
+  _pendingShift: null,
 
   // ── DB data helpers (used by all tabs) ───────────────────
   buildAssignments(dbData) {
@@ -179,9 +180,10 @@ const App = {
       await this._pruneStalePersonas(this._data.ebanistas || [], this._data.pintores || []);
       // Auto-historial cross-reference
       await Sync.runAutoHistorial(this._data.ops || [], this._dbData.asignaciones);
-      // Push out lower-priority fecha límites that now conflict with a
-      // higher-priority OP's date (writes the new dates to ClickUp for real)
-      this._lastPriorityShifts = await this._reconcilePriorityDates();
+      // Detect brand-new OPs in the top-priority project and, if found,
+      // create/update a pending shift proposal (no ClickUp write yet —
+      // that only happens once someone approves it from the banner)
+      await this._refreshPendingShift();
       this._renderAll();
       this._setStatus(this._syncLabel(), 'ok');
     } catch (e) {
@@ -209,26 +211,28 @@ const App = {
     return durations.length % 2 ? durations[mid] : (durations[mid - 1] + durations[mid]) / 2;
   },
 
-  // When brand-new OPs show up in the #1 priority project, every OP still
-  // sitting at the generic "Fábrica" status (no specific stage yet) gets
-  // pushed out by (# of new OPs) × (real days-per-OP pace) — once,
-  // uniformly, no per-item comparisons or chaining. A real, permanent
-  // write to ClickUp's due date. "New" is tracked in Supabase (shared
-  // across every device/tab) so it fires exactly once per arrival; the
-  // very first sync just records the current OPs as a baseline without
-  // shifting anything.
-  async _reconcilePriorityDates() {
-    if (!this._data?.ops?.length) return [];
+  // When brand-new OPs show up in the #1 priority project, this creates
+  // (or tops up) a pending shift proposal — it does NOT touch ClickUp.
+  // The proposal accumulates: if more new OPs arrive in the top project
+  // before the pending one is resolved, they add to the same count and
+  // the push_days is recalculated from the total. Reordering the Tablero
+  // priority list afterward does not cancel a pending proposal — it only
+  // affects which project's arrivals get detected in future syncs.
+  // "Seen" is tracked in Supabase (shared across every device/tab) so an
+  // arrival is only ever counted once; the very first sync just records
+  // the current OPs as a baseline without proposing anything.
+  async _refreshPendingShift() {
+    if (!this._data?.ops?.length) { this._pendingShift = null; return; }
 
-    const priority    = this.buildPriorities(this._dbData);
-    const topProject  = priority[0] || null;
+    const priority   = this.buildPriorities(this._dbData);
+    const topProject = priority[0] || null;
 
     let seenIds;
     try {
       seenIds = await DB.getSeenOpIds();
     } catch (e) {
-      console.warn('[App] cron_seen_ops table missing? Skipping priority push:', e.message);
-      return [];
+      console.warn('[App] cron_seen_ops table missing? Skipping priority detection:', e.message);
+      return;
     }
 
     const isFirstRun = seenIds.size === 0;
@@ -237,14 +241,37 @@ const App = {
       await DB.markOpsSeen(unseenIds).catch(e => console.warn('[App] markOpsSeen failed:', e.message));
     }
 
-    if (isFirstRun || !topProject) return [];
+    let pending;
+    try {
+      pending = await DB.getPendingShift();
+    } catch (e) {
+      console.warn('[App] cron_pending_shift table missing? Skipping priority detection:', e.message);
+      return;
+    }
 
-    const newTopProjectCount = this._data.ops
-      .filter(op => op.project === topProject && !seenIds.has(op.id)).length;
-    if (!newTopProjectCount) return [];
+    if (!isFirstRun && topProject) {
+      const newCount = this._data.ops.filter(op => op.project === topProject && !seenIds.has(op.id)).length;
+      if (newCount) {
+        const totalCount = (pending?.new_op_count || 0) + newCount;
+        const pushDays   = totalCount * this._computeDaysPerOp();
+        pending = await DB.upsertPendingShift({
+          id: pending?.id, top_project: topProject, new_op_count: totalCount, push_days: pushDays,
+        }).catch(e => { console.warn('[App] upsertPendingShift failed:', e.message); return pending; });
+      }
+    }
 
-    const pushDays = newTopProjectCount * this._computeDaysPerOp();
-    const pushMs   = pushDays * 86400000;
+    this._pendingShift = pending;
+  },
+
+  // Applies the pending shift for real: reads each qualifying OP's
+  // *current* fecha límite (not a stale snapshot from detection time, in
+  // case it changed manually meanwhile) and pushes it out by the stored
+  // push_days — once, uniformly, no per-item comparisons or chaining.
+  async approvePendingShift() {
+    const pending = this._pendingShift;
+    if (!pending || !this._data?.ops?.length) return;
+
+    const pushMs = pending.push_days * 86400000;
     const shifts = this._data.ops
       .filter(op => op.status === 'fabrica' && op.salidaFabrica)
       .map(op => ({ op, oldDate: op.salidaFabrica, newDate: new Date(op.salidaFabrica.getTime() + pushMs) }));
@@ -258,7 +285,22 @@ const App = {
       }
     }
     if (shifts.length) PlantaAPI.clearCache();
-    return shifts;
+
+    await DB.resolvePendingShift(pending.id, 'approved')
+      .catch(e => console.warn('[App] resolvePendingShift failed:', e.message));
+
+    this._lastPriorityShifts = shifts;
+    this._pendingShift = null;
+    this._renderAll();
+  },
+
+  async rejectPendingShift() {
+    const pending = this._pendingShift;
+    if (!pending) return;
+    await DB.resolvePendingShift(pending.id, 'rejected')
+      .catch(e => console.warn('[App] resolvePendingShift failed:', e.message));
+    this._pendingShift = null;
+    this._renderAll();
   },
 
   // Seed personas table with names from ClickUp EBANISTA dropdown (non-destructive)
@@ -327,6 +369,38 @@ const App = {
     Cronograma.render(payload);
     Rendimiento.render(payload);
     this._renderRolesList();
+    this._renderGlobalBanner();
+  },
+
+  // Persistent banner shown above every tab while a priority-driven fecha
+  // límite shift is awaiting approval or rejection.
+  _renderGlobalBanner() {
+    const box = el('global-shift-banner');
+    if (!box) return;
+    const p = this._pendingShift;
+    if (!p) {
+      box.innerHTML = '';
+      box.classList.remove('visible');
+      document.body.classList.remove('has-pending-shift');
+      return;
+    }
+
+    const pushDays = Math.round(p.push_days * 10) / 10;
+    box.innerHTML = `
+      <div class="gsb-inner">
+        <span class="gsb-icon">📌</span>
+        <span class="gsb-text">${p.new_op_count} OP${p.new_op_count !== 1 ? 's' : ''} nueva${p.new_op_count !== 1 ? 's' : ''} en <strong>${esc(p.top_project)}</strong> — se propone mover <strong>${pushDays} día${pushDays !== 1 ? 's' : ''}</strong> las fechas límite de fábrica</span>
+        <div class="gsb-actions">
+          <button class="btn-primary btn-sm" id="btn-approve-shift">✔ Aprobar</button>
+          <button class="btn-secondary btn-sm" id="btn-reject-shift">✕ Rechazar</button>
+        </div>
+      </div>
+    `;
+    box.classList.add('visible');
+    document.body.classList.add('has-pending-shift');
+
+    el('btn-approve-shift')?.addEventListener('click', () => this.approvePendingShift());
+    el('btn-reject-shift')?.addEventListener('click', () => this.rejectPendingShift());
   },
 
   renderPanel() {

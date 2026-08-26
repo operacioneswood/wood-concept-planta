@@ -231,6 +231,27 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
+  // CRON_PENDING_SHIFT  (one accumulating fecha-límite proposal awaiting
+  // manual approval — shared across every device)
+  // ════════════════════════════════════════════════════════
+  async getPendingShift() {
+    const rows = await this._q(sb => sb.from('cron_pending_shift')
+      .select('*').eq('status', 'pending').order('created_at', { ascending: false }).limit(1));
+    return (rows && rows[0]) || null;
+  },
+
+  async upsertPendingShift({ id, top_project, new_op_count, push_days }) {
+    const row = { top_project, new_op_count, push_days, status: 'pending' };
+    if (id) row.id = id;
+    return this._q(sb => sb.from('cron_pending_shift').upsert(row).select().single());
+  },
+
+  async resolvePendingShift(id, status) {
+    return this._q(sb => sb.from('cron_pending_shift')
+      .update({ status, resolved_at: new Date().toISOString() }).eq('id', id));
+  },
+
+  // ════════════════════════════════════════════════════════
   // VINCULOS  (2 OPs sharing one physical plano — linked as one)
   // ════════════════════════════════════════════════════════
   async getVinculos() {
@@ -308,6 +329,16 @@ const DB = {
       create table if not exists cron_seen_ops (
         op_id            text primary key,
         seen_at          timestamptz not null default now()
+      );
+
+      create table if not exists cron_pending_shift (
+        id               uuid primary key default gen_random_uuid(),
+        created_at       timestamptz not null default now(),
+        top_project      text not null,
+        new_op_count     integer not null,
+        push_days        numeric not null,
+        status           text not null default 'pending',
+        resolved_at      timestamptz
       );
 
       create table if not exists op_vinculos (
