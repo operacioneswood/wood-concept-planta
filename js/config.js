@@ -21,6 +21,12 @@ const STAGE_FIN    = { corte: 'finCorte',    enchape: 'finEnchape',    ebanister
 // ── ClickUp statuses that count as "in plant" ─────────────────
 const ACTIVE_STATUSES = new Set(['fabrica', 'corte', 'enchape', 'ebanisteria', 'en ebanisteria', 'en pintura', 'pendiente de revision', 'reproceso', 'pendiente por obra', 'pendiente chapilla']);
 
+// Statuses that haven't entered any concrete production stage yet — only
+// these are eligible for the priority-based fecha límite push. An OP
+// already in corte/enchape/ebanistería/pintura is in progress and its
+// date should not move.
+const PRIORITY_SHIFTABLE_STATUSES = new Set(['fabrica', 'pendiente por obra', 'pendiente chapilla']);
+
 const STATUS_DISPLAY = {
   'fabrica':               { label: 'Fábrica',              cls: 'sb-green'  },
   'en ebanisteria':        { label: 'En Ebanistería',       cls: 'sb-amber'  },

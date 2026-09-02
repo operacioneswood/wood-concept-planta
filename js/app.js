@@ -274,8 +274,11 @@ const App = {
   },
 
   // Applies one pending shift for real: pushes out the fecha límite of
-  // every "Fábrica" OP whose project ranks *after* the one that triggered
-  // this proposal (in the live Tablero order at approval time) — the
+  // every OP still in a PRIORITY_SHIFTABLE_STATUSES status (i.e. not yet
+  // in a concrete production stage — corte/enchape/ebanistería/pintura
+  // are excluded, since those are already in progress) whose project
+  // ranks *after* the one that triggered this proposal (in the live
+  // Tablero order at approval time) — the
   // triggering project and anything ranked ahead of it are left alone.
   // Reads each qualifying OP's *current* fecha límite (not a stale
   // snapshot from detection time, in case it changed manually meanwhile)
@@ -290,7 +293,7 @@ const App = {
 
     const pushMs = pending.push_days * 86400000;
     const shifts = this._data.ops
-      .filter(op => op.status === 'fabrica' && op.salidaFabrica)
+      .filter(op => PRIORITY_SHIFTABLE_STATUSES.has(op.status) && op.salidaFabrica)
       .filter(op => {
         if (rank === -1) return false; // trigger project no longer ranked — nothing to shift
         const opRank = priority.indexOf(op.project);
