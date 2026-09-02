@@ -212,17 +212,23 @@ const App = {
     return durations.length % 2 ? durations[mid] : (durations[mid - 1] + durations[mid]) / 2;
   },
 
-  // When brand-new OPs show up in ANY ranked project (not just #1), this
-  // creates (or tops up) a pending shift proposal for that project — it
-  // does NOT touch ClickUp. Each ranked project can have at most one open
-  // proposal at a time: more new OPs arriving in the same project before
-  // it's resolved add to the same count and push_days is recalculated
-  // from the total. Reordering the Tablero list afterward does not cancel
-  // an existing proposal — the affected projects (whichever rank *after*
-  // the trigger) are resolved from the live order at approval time.
-  // "Seen" is tracked in Supabase (shared across every device/tab) so an
-  // arrival is only ever counted once; the very first sync just records
-  // the current OPs as a baseline without proposing anything.
+  // When a brand-new OP shows up *with "Fábrica" status* in ANY ranked
+  // project (not just #1), this creates (or tops up) a pending shift
+  // proposal for that project — it does NOT touch ClickUp. An OP that's
+  // new but sitting in some other status (e.g. "pendiente por obra") does
+  // NOT count as a trigger — only an actual arrival into the Fábrica
+  // queue does. Each ranked project can have at most one open proposal at
+  // a time: more Fábrica arrivals in the same project before it's
+  // resolved add to the same count and push_days is recalculated from
+  // the total. Reordering the Tablero list afterward does not cancel an
+  // existing proposal — the affected projects (whichever rank *after* the
+  // trigger) are resolved from the live order at approval time.
+  // "Seen" is tracked in Supabase (shared across every device/tab), scoped
+  // to Fábrica-status sightings only — so an OP that first appears in a
+  // different status and only later moves into Fábrica is still correctly
+  // detected as a new arrival at that point. An arrival is only ever
+  // counted once; the very first sync just records the OPs already in
+  // Fábrica as a baseline without proposing anything.
   async _refreshPendingShifts() {
     if (!this._data?.ops?.length) { this._pendingShifts = []; return; }
 
@@ -237,9 +243,10 @@ const App = {
     }
 
     const isFirstRun = seenIds.size === 0;
-    const unseenIds  = this._data.ops.map(op => op.id).filter(id => !seenIds.has(id));
-    if (unseenIds.length) {
-      await DB.markOpsSeen(unseenIds).catch(e => console.warn('[App] markOpsSeen failed:', e.message));
+    const fabricaOps  = this._data.ops.filter(op => op.status === 'fabrica');
+    const unseenFabricaIds = fabricaOps.map(op => op.id).filter(id => !seenIds.has(id));
+    if (unseenFabricaIds.length) {
+      await DB.markOpsSeen(unseenFabricaIds).catch(e => console.warn('[App] markOpsSeen failed:', e.message));
     }
 
     let pending;
@@ -253,7 +260,7 @@ const App = {
 
     if (!isFirstRun) {
       for (const proj of priority) {
-        const newCount = this._data.ops.filter(op => op.project === proj && !seenIds.has(op.id)).length;
+        const newCount = fabricaOps.filter(op => op.project === proj && !seenIds.has(op.id)).length;
         if (!newCount) continue;
 
         const existing   = pending.find(p => p.top_project === proj);
@@ -429,9 +436,19 @@ const App = {
     document.body.classList.add('has-pending-shift');
 
     box.querySelectorAll('.gsb-approve').forEach(btn =>
-      btn.addEventListener('click', () => this.approvePendingShift(btn.dataset.id)));
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        btn.closest('.gsb-inner').querySelectorAll('button').forEach(b => b.disabled = true);
+        btn.textContent = '⏳ Aplicando...';
+        this.approvePendingShift(btn.dataset.id);
+      }));
     box.querySelectorAll('.gsb-reject').forEach(btn =>
-      btn.addEventListener('click', () => this.rejectPendingShift(btn.dataset.id)));
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        btn.closest('.gsb-inner').querySelectorAll('button').forEach(b => b.disabled = true);
+        btn.textContent = '⏳';
+        this.rejectPendingShift(btn.dataset.id);
+      }));
   },
 
   renderPanel() {

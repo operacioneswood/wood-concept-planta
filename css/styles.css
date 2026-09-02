@@ -141,6 +141,7 @@ body.has-pending-shift .app-body { padding-top: 0; }
 .gsb-icon { font-size: 1rem; flex-shrink: 0; }
 .gsb-text { flex: 1; font-size: 0.85rem; color: var(--accent); }
 .gsb-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.gsb-actions button:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ════════════════════════════════════════════════════════════
    TAB SCREENS
