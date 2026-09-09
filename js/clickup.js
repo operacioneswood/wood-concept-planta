@@ -28,7 +28,6 @@ const PlantaAPI = {
       if (!c || !c.timestamp || !Array.isArray(c.ops)) return null;
       // Re-hydrate Date objects (JSON.stringify kills them)
       c.ops = c.ops.map(op => this._rehydrateOp(op));
-      c.installOps = (c.installOps || []).map(op => this._rehydrateOp(op));
       return c;
     } catch { return null; }
   },
@@ -40,7 +39,6 @@ const PlantaAPI = {
       'inicioEbanisteria','finEbanisteria',
       'inicioPintura','finPintura','entregaPintura','inicioReproceso','finReproceso',
       'salidaFabrica','envioFabrica',
-      'fechaEmpaque','envioInstalacion','inicioInstalacion',
     ];
     const out = { ...op };
     for (const k of dateKeys) {
@@ -128,9 +126,6 @@ const PlantaAPI = {
     const ebanistaOpts = {};  // normStr(name) → ClickUp option UUID
     const pintoresSet  = new Set();
     const pintorOpts   = {};  // normStr(name) → ClickUp option UUID
-    const instaladoresSet = new Set();
-    const instaladorOpts  = {}; // normStr(name) → ClickUp option UUID
-    const estatusInstalacionOpts = {}; // normStr(optionName) → ClickUp option UUID
 
     for (const t of rawTasks) {
       for (const cf of (t.custom_fields || [])) {
@@ -154,21 +149,6 @@ const PlantaAPI = {
               pintoresSet.add(opt.name);
               pintorOpts[normStr(opt.name)] = opt.id;
             }
-          }
-        }
-        // Collect instaladores dropdown options
-        if (norm.includes('instalador') && cf.type === 'drop_down') {
-          for (const opt of (cf.type_config?.options || [])) {
-            if (opt.name) {
-              instaladoresSet.add(opt.name);
-              instaladorOpts[normStr(opt.name)] = opt.id;
-            }
-          }
-        }
-        // Collect "estatus instalación" dropdown options
-        if (norm.includes('estatus instalac') && cf.type === 'drop_down') {
-          for (const opt of (cf.type_config?.options || [])) {
-            if (opt.name) estatusInstalacionOpts[normStr(opt.name)] = opt.id;
           }
         }
       }
@@ -210,13 +190,6 @@ const PlantaAPI = {
       pintor:             find('pintor'),
       pintorOpts,
       extra:              find('extra'),
-      fechaEmpaque:       find('fecha de empaque', 'fecha empaque'),
-      envioInstalacion:   find('envio para instalacion', 'envío para instalación'),
-      inicioInstalacion:  find('inicio de instalacion', 'inicio de instalación'),
-      estatusInstalacion: find('estatus instalacion', 'estatus instalación'),
-      estatusInstalacionOpts,
-      instaladores:       find('instaladores', 'instalador'),
-      instaladorOpts,
     };
     console.log('[CU] _detectFields fieldIds:', JSON.stringify(fieldIds));
 
@@ -224,7 +197,6 @@ const PlantaAPI = {
       fieldIds,
       ebanistas: [...ebanistasSet].sort(),
       pintores:  [...pintoresSet].sort(),
-      instaladoresList: [...instaladoresSet].sort(),
     };
   },
 
@@ -313,12 +285,6 @@ const PlantaAPI = {
       causaReproceso:      causa,
       envioFabrica:        getDate(fieldIds.envioFabrica),
       salidaFabrica:       tsToDate(raw.due_date || null),
-      // Instalación
-      fechaEmpaque:        getDate(fieldIds.fechaEmpaque),
-      envioInstalacion:    getDate(fieldIds.envioInstalacion),
-      inicioInstalacion:   getDate(fieldIds.inicioInstalacion),
-      estatusInstalacion:  getDropdownName(fieldIds.estatusInstalacion),
-      instalador:          getDropdownName(fieldIds.instaladores),
       acabado: (() => {
         const v = getField(fieldIds.acabado);
         if (v === null || v === undefined) return '';
@@ -436,7 +402,7 @@ const PlantaAPI = {
     prog(`Procesando ${rawTasks.length} tareas...`);
 
     // Detect fields
-    const { fieldIds, ebanistas, pintores, instaladoresList } = this._detectFields(rawTasks);
+    const { fieldIds, ebanistas, pintores } = this._detectFields(rawTasks);
 
     // Build a full node map for chain traversal: id → { name, parent }
     const nodeMap = {};
@@ -473,24 +439,9 @@ const PlantaAPI = {
       })
       .filter(Boolean);
 
-    // Same traversal, but for OPs currently in the packing/installation
-    // lifecycle (INSTALL_STATUSES) — kept separate from `ops` so every
-    // existing fábrica view keeps seeing exactly what it saw before.
-    const installOps = rawTasks
-      .filter(t => t.parent && INSTALL_STATUSES.has(normStr(t.status?.status || '')))
-      .map(t => {
-        const rootProject = findRootProject(t.id);
-        if (!rootProject) return null;
-        const op = this._parseTask(t, fieldIds);
-        op.project  = rootProject;
-        op.parentId = t.parent;
-        return op;
-      })
-      .filter(Boolean);
-
     prog(`${ops.length} OPs activos encontrados.`);
 
-    const result = { ops, installOps, ebanistas, pintores, instaladoresList, fieldIds, lastSync: Date.now() };
+    const result = { ops, ebanistas, pintores, fieldIds, lastSync: Date.now() };
     this._setCache(result);
     return result;
   },

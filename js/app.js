@@ -128,7 +128,7 @@ const App = {
 
   async _loadDbData() {
     try {
-      const [asignaciones, prioridades, produccion, personas, historial, tiempos, planos, partes, vinculos, bitacoraInstalacion, instalacionOps] = await Promise.all([
+      const [asignaciones, prioridades, produccion, personas, historial, tiempos, planos, partes, vinculos] = await Promise.all([
         DB.getAsignaciones(),
         DB.getPrioridades(),
         DB.getProduccion(),
@@ -138,8 +138,6 @@ const App = {
         DB.getPlanos(),
         DB.getPartes(),
         DB.getVinculos().catch(e => { console.warn('[App] op_vinculos table missing?', e.message); return []; }),
-        DB.getBitacoraInstalacion().catch(e => { console.warn('[App] bitacora_instalacion table missing?', e.message); return []; }),
-        DB.getInstalacionOps().catch(e => { console.warn('[App] instalacion_ops table missing?', e.message); return []; }),
       ]);
       this._dbData = {
         asignaciones: asignaciones || [],
@@ -151,8 +149,6 @@ const App = {
         planos:       planos       || [],
         partes:       partes       || [],
         vinculos:     vinculos     || [],
-        bitacoraInstalacion: bitacoraInstalacion || [],
-        instalacionOps:      instalacionOps      || [],
       };
     } catch (e) {
       console.error('[App] DB load failed:', e.message);
@@ -405,7 +401,6 @@ const App = {
     Asignacion.render(payload);
     Cronograma.render(payload);
     Rendimiento.render(payload);
-    Instalacion.render(payload);
     this._renderRolesList();
     this._renderGlobalBanner();
   },
