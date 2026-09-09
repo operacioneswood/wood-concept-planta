@@ -216,6 +216,41 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
+  // BITACORA_INSTALACION  (event log per OP: notas, pausas, cambios en
+  // sitio, reprocesos — shown in the Instalación tab)
+  // ════════════════════════════════════════════════════════
+  async getBitacoraInstalacion() {
+    return this._q(sb => sb.from('bitacora_instalacion').select('*').order('created_at', { ascending: false }));
+  },
+
+  async addBitacoraEntry({ op_id, tipo = 'nota', texto = null, autor = null, es_reproceso = false }) {
+    return this._q(sb => sb.from('bitacora_instalacion')
+      .insert({ op_id, tipo, texto, autor, es_reproceso })
+      .select().single());
+  },
+
+  async deleteBitacoraEntry(id) {
+    const { error } = await this._sb.from('bitacora_instalacion').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // ════════════════════════════════════════════════════════
+  // INSTALACION_OPS  (per-OP install tracking that ClickUp has no field
+  // for: fecha de fin real, y si la OP llegó completa desde fábrica)
+  // ════════════════════════════════════════════════════════
+  async getInstalacionOps() {
+    return this._q(sb => sb.from('instalacion_ops').select('*'));
+  },
+
+  async upsertInstalacionOp({ op_id, fecha_fin, llego_completa, faltante }) {
+    const row = { op_id, updated_at: new Date().toISOString() };
+    if (fecha_fin       !== undefined) row.fecha_fin      = fecha_fin;
+    if (llego_completa  !== undefined) row.llego_completa = llego_completa;
+    if (faltante        !== undefined) row.faltante       = faltante;
+    return this._q(sb => sb.from('instalacion_ops').upsert(row, { onConflict: 'op_id' }).select().single());
+  },
+
+  // ════════════════════════════════════════════════════════
   // CRON_SEEN_OPS  (which OPs the priority-push logic has already seen —
   // shared across every device so a new arrival only triggers one push)
   // ════════════════════════════════════════════════════════
@@ -339,6 +374,24 @@ const DB = {
         push_days        numeric not null,
         status           text not null default 'pending',
         resolved_at      timestamptz
+      );
+
+      create table if not exists bitacora_instalacion (
+        id               uuid primary key default gen_random_uuid(),
+        op_id            text not null,
+        tipo             text not null default 'nota',
+        texto            text,
+        autor            text,
+        es_reproceso     boolean not null default false,
+        created_at       timestamptz not null default now()
+      );
+
+      create table if not exists instalacion_ops (
+        op_id            text primary key,
+        fecha_fin        date,
+        llego_completa   boolean,
+        faltante         text,
+        updated_at       timestamptz not null default now()
       );
 
       create table if not exists op_vinculos (
