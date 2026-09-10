@@ -103,9 +103,14 @@ const PlantaAPI = {
   },
 
   // ── Fetch all pages from a single list ───────────────────
+  // Loop bound is a safety ceiling (20,000 tasks), not an expected limit —
+  // the real stop condition is a short/last page. The main project list
+  // already passed 2,000 tasks (20 pages), which used to be the loop cap
+  // and silently dropped everything after it; don't reintroduce a cap
+  // low enough to hit as the list keeps growing.
   async _fetchAllPages(listId, onProgress) {
     const tasks = [];
-    for (let page = 0; page < 20; page++) {
+    for (let page = 0; page < 200; page++) {
       const data = await this._call(`list/${listId}/task`, {
         include_closed: 'true',
         subtasks:       'true',
