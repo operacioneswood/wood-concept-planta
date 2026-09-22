@@ -497,6 +497,34 @@ const Asignacion = {
               PlantaAPI.clearCache();
             }
           }
+          // Contratistas asignados a Ebanistería: reflejar el EBANISTA y marcar
+          // Inicio Ebanistería en ClickUp desde el momento de la asignación, sin
+          // esperar a pulsar ▶ Inicio. Solo aplica a personas clasificadas como
+          // Contratista (Configuración → Roles del personal) — nunca a ebanistas
+          // ni pintores.
+          if (!op?.extra && stage === 'ebanisteria') {
+            const personasMap   = App.buildPersonasMap(App._dbData);
+            const isContratista = personasMap[person] === 'contratista'
+              || CONTRATISTAS_CONOCIDOS.has(person.toLowerCase());
+            if (isContratista) {
+              const ebanistaOpts = fieldIds?.ebanistaOpts || {};
+              const optId = ebanistaOpts[normStr(person)];
+              const ts    = date ? isoToDate(date).getTime() : Date.now();
+              await Promise.all(ids.map(async id => {
+                if (optId && fieldIds?.ebanista) {
+                  await PlantaAPI.setField(id, fieldIds.ebanista, optId).catch(e =>
+                    console.warn('[Asignacion] No se pudo asignar ebanista dropdown (contratista):', e.message));
+                }
+                const o = App._data?.ops.find(x => x.id === id);
+                if (fieldIds?.inicioEbanisteria && !o?.inicioEbanisteria) {
+                  await PlantaAPI.setField(id, fieldIds.inicioEbanisteria, ts).catch(e =>
+                    console.warn('[Asignacion] No se pudo marcar inicio ebanisteria (contratista):', e.message));
+                  if (o) o.inicioEbanisteria = new Date(ts);
+                }
+              }));
+              PlantaAPI.clearCache();
+            }
+          }
           // Pintura: mirror the assigned person into ClickUp's PINTOR dropdown
           if (stage === 'pintura') {
             const pintorOpts = fieldIds?.pintorOpts || {};
