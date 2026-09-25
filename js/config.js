@@ -35,6 +35,7 @@ const STATUS_DISPLAY = {
   'reproceso':             { label: 'Reproceso',            cls: 'sb-repro'  },
   'pendiente por obra':    { label: 'Pend. por Obra',       cls: 'sb-obra'   },
   'pendiente chapilla':    { label: 'Pend. Chapilla',       cls: 'sb-chapilla' },
+  'empaque':               { label: 'Empaque',              cls: 'sb-other'  },
 };
 
 // ── Priority-based fecha límite push ────────────────────────────
