@@ -28,6 +28,7 @@ const PlantaAPI = {
       if (!c || !c.timestamp || !Array.isArray(c.ops)) return null;
       // Re-hydrate Date objects (JSON.stringify kills them)
       c.ops = c.ops.map(op => this._rehydrateOp(op));
+      c.opsEmpaque = (c.opsEmpaque || []).map(op => this._rehydrateOp(op));
       return c;
     } catch { return null; }
   },
@@ -432,21 +433,32 @@ const PlantaAPI = {
     // Only subtasks (parent !== null) with an active status are OPs.
     // Traverse the full chain to find the real root project name.
     // Skip any OP whose root project cannot be identified.
+    const toOp = t => {
+      const rootProject = findRootProject(t.id);
+      if (!rootProject) return null;        // no identifiable root → discard
+      const op = this._parseTask(t, fieldIds);
+      op.project  = rootProject;            // always the root task name
+      op.parentId = t.parent;
+      return op;
+    };
+
     const ops = rawTasks
       .filter(t => t.parent && ACTIVE_STATUSES.has(normStr(t.status?.status || '')))
-      .map(t => {
-        const rootProject = findRootProject(t.id);
-        if (!rootProject) return null;        // no identifiable root → discard
-        const op = this._parseTask(t, fieldIds);
-        op.project  = rootProject;            // always the root task name
-        op.parentId = t.parent;
-        return op;
-      })
+      .map(toOp)
+      .filter(Boolean);
+
+    // Empaque isn't a production status (nothing left to assign on the
+    // floor), so it stays out of ACTIVE_STATUSES and out of `ops` — Panel,
+    // Tablero and Asignación never see it. Cronograma wants it anyway, so
+    // it gets its own list instead of widening ACTIVE_STATUSES.
+    const opsEmpaque = rawTasks
+      .filter(t => t.parent && normStr(t.status?.status || '') === 'empaque')
+      .map(toOp)
       .filter(Boolean);
 
     prog(`${ops.length} OPs activos encontrados.`);
 
-    const result = { ops, ebanistas, pintores, fieldIds, lastSync: Date.now() };
+    const result = { ops, opsEmpaque, ebanistas, pintores, fieldIds, lastSync: Date.now() };
     this._setCache(result);
     return result;
   },
