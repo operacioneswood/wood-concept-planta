@@ -9,8 +9,11 @@ const Cronograma = {
   _sub:      'fabrica',
   _fabView:  'proyecto',   // 'proyecto' | 'urgencia'
 
-  render({ ops, fieldIds, dbData }) {
-    this._ops      = ops      || [];
+  render({ ops, opsEmpaque, fieldIds, dbData }) {
+    // Empaque no cuenta como "activo" para Panel/Tablero/Asignación, pero en
+    // Cronograma sí queremos verlo (la Pintura sigue filtrando por su propio
+    // estado, así que no se cuela ahí).
+    this._ops      = [...(ops || []), ...(opsEmpaque || [])];
     this._fieldIds = fieldIds || {};
     this._dbData   = dbData;
     this._draw();
@@ -723,7 +726,7 @@ ${paintersHtml}
       inp.addEventListener('change', async () => {
         const { opid, opid2, fieldkey } = inp.dataset;
         const ids = [opid, opid2].filter(Boolean);
-        const op = App._data?.ops.find(o => o.id === opid);
+        const op = this._ops.find(o => o.id === opid);
         if (!op) return;
         const val = inp.value;
         if (!val) return;
@@ -744,7 +747,7 @@ ${paintersHtml}
             await Promise.all(ids.map(id => PlantaAPI.setField(id, fid, ms)));
           }
           for (const id of ids) {
-            const o = App._data?.ops.find(x => x.id === id);
+            const o = this._ops.find(x => x.id === id);
             if (o) o[fieldkey] = new Date(ms);
           }
           inp.style.outline = '2px solid var(--green)';
@@ -788,7 +791,7 @@ ${paintersHtml}
       inp.addEventListener('change', async () => {
         const { opid, fieldkey } = inp.dataset;
         const fid = this._fieldIds[fieldkey];
-        const op  = App._data?.ops.find(o => o.id === opid);
+        const op  = this._ops.find(o => o.id === opid);
         if (!op || !fid) return;
         inp.disabled = true;
         try {
