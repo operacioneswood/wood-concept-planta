@@ -54,7 +54,8 @@ const Cronograma = {
         <button class="cron-subtab ${this._sub === 'pintura' ? 'active' : ''}" data-sub="pintura">🎨 Pintura</button>
       </div>
       <div class="cron-body">
-        ${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}
+        <div class="asign-search-wrap" style="padding-top:12px"><input type="search" id="cron-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre..." value="${esc(this._search || '')}"></div>
+${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}
       </div>
     `;
     wrap.querySelector('#btn-dismiss-shifts')?.addEventListener('click', () => {
