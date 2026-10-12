@@ -77,6 +77,12 @@ ${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}
     const printBtn = wrap.querySelector('#btn-print-pintura');
     if (printBtn) printBtn.addEventListener('click', () => this._printPintura());
     this._bindEdits(wrap);
+const searchInp = wrap.querySelector('#cron-search');
+if (searchInp) {
+const applySearch = () => { this._search = searchInp.value; const q = normStr(searchInp.value); wrap.querySelectorAll('.cron-block').forEach(block => { const hdrHit = !q || normStr(block.querySelector('.cron-hdr-name')?.textContent || '').includes(q); let any = false; block.querySelectorAll('tbody tr').forEach(tr => { const txt = normStr(tr.textContent + ' ' + [...tr.querySelectorAll('input[type=text]')].map(i => i.value).join(' ')); const show = hdrHit || txt.includes(q); tr.style.display = show ? '' : 'none'; if (show) any = true; }); block.style.display = any ? '' : 'none'; }); };
+searchInp.addEventListener('input', applySearch);
+applySearch();
+          }
     wrap.querySelectorAll('.btn-print-proj').forEach(btn => {
       btn.addEventListener('click', () => {
         const projName = btn.dataset.proj;
