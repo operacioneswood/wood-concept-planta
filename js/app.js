@@ -277,7 +277,9 @@ const App = {
       }
     }
 
-    this._pendingShifts = pending;
+    // Una propuesta solo tiene sentido mientras el proyecto aún tenga OPs en estado Fábrica; si ya salieron (p. ej. pasaron a pintura), se descarta sola.
+for (const p of [...pending]) { if (fabricaOps.some(op => op.project === p.top_project)) continue; await DB.resolvePendingShift(p.id, 'rejected').catch(e => console.warn('[App] auto-descarte falló:', e.message)); pending.splice(pending.indexOf(p), 1); }
+this._pendingShifts = pending;
   },
 
   // Applies one pending shift for real: pushes out the fecha límite of
