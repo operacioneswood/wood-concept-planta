@@ -680,7 +680,7 @@ _renderEmpaque() {
 const ops = this._empaqueOps();
 if (!ops.length) return '<div class="cron-empty">Sin OPs en estado Empaque.</div>';
 const general = localStorage.getItem('wp_cron_empaque_general') || '';
-const bar = `<div class="cron-print-bar"><button class="cron-print-btn" id="btn-print-empaque">🖨 Imprimir reporte de empaque</button></div><div style="padding:12px 16px;margin-bottom:12px;background:var(--card);border:1px solid var(--border);border-radius:8px"><label style="font-size:12px;font-weight:600;color:var(--muted)">Comentarios generales del envío (salen en el reporte)</label><textarea id="empaque-general" rows="2" style="width:100%;margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px" placeholder="Notas para el reporte de envío...">${esc(general)}</textarea></div>`;
+const bar = `<div class="cron-print-bar"><button class="cron-print-btn" id="btn-print-empaque">🖨 Imprimir reporte de empaque</button></div>`;
 const byProj = {};
 for (const op of ops) { const p = op.project || 'Sin proyecto'; (byProj[p] = byProj[p] || []).push(op); }
 const blocks = Object.entries(byProj).map(([project, list]) => {
