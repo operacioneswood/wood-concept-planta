@@ -52,6 +52,7 @@ const Cronograma = {
       <div class="cron-subtabs">
         <button class="cron-subtab ${this._sub === 'fabrica' ? 'active' : ''}" data-sub="fabrica">🏭 Fábrica</button>
         <button class="cron-subtab ${this._sub === 'pintura' ? 'active' : ''}" data-sub="pintura">🎨 Pintura</button>
+<button class="cron-subtab ${this._sub === 'empaque' ? 'active' : ''}" data-sub="empaque">📦 Empaque (${this._empaqueOps().length})</button>
       </div>
       <div class="cron-body">
         <div class="asign-search-wrap" style="padding-top:12px"><input type="search" id="cron-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre..." value="${esc(this._search || '')}"></div>
