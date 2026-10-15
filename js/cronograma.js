@@ -727,7 +727,7 @@ tr.grp td { background: #f2f6f3; font-weight: 700; color: #2f5d40; font-size: 10
 </style></head><body>
 <div class="proj-hdr"><div class="proj-title">Reporte de Empaque</div><div class="proj-date">${todayFmt}</div></div>
 <table><thead><tr><th>#</th><th>No. OP</th><th>Descripción</th><th>Fecha límite</th><th>Comentarios</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="gen"><h3>Comentarios</h3><div>${esc(general)}</div></div>
+
 <div class="tbl-footer">${ops.length} ítem${ops.length !== 1 ? 's' : ''} en empaque · Wood Concept Planta</div>
 </body></html>`;
 const win = window.open('', '_blank', 'width=900,height=700');
