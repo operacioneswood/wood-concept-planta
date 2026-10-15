@@ -77,6 +77,11 @@ ${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}
     const printBtn = wrap.querySelector('#btn-print-pintura');
     if (printBtn) printBtn.addEventListener('click', () => this._printPintura());
     this._bindEdits(wrap);
+const prtEmp = wrap.querySelector('#btn-print-empaque');
+if (prtEmp) prtEmp.addEventListener('click', () => this._printEmpaque());
+wrap.querySelectorAll('.cron-empaque-comment-inp').forEach(inp => inp.addEventListener('input', () => { const v = inp.value.trim(); if (v) localStorage.setItem('wp_cron_empaque_comment_' + inp.dataset.opid, v); else localStorage.removeItem('wp_cron_empaque_comment_' + inp.dataset.opid); }));
+const genEmp = wrap.querySelector('#empaque-general');
+if (genEmp) genEmp.addEventListener('input', () => { const v = genEmp.value.trim(); if (v) localStorage.setItem('wp_cron_empaque_general', v); else localStorage.removeItem('wp_cron_empaque_general'); });
 const searchInp = wrap.querySelector('#cron-search');
 if (searchInp) {
 const applySearch = () => { this._search = searchInp.value; const q = normStr(searchInp.value); wrap.querySelectorAll('.cron-block').forEach(block => { const hdrHit = !q || normStr(block.querySelector('.cron-hdr-name')?.textContent || '').includes(q); let any = false; block.querySelectorAll('tbody tr').forEach(tr => { const txt = normStr(tr.textContent + ' ' + [...tr.querySelectorAll('input[type=text]')].map(i => i.value).join(' ')); const show = hdrHit || txt.includes(q); tr.style.display = show ? '' : 'none'; if (show) any = true; }); block.style.display = any ? '' : 'none'; }); };
