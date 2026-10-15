@@ -355,6 +355,7 @@ applySearch();
   },
 
   _renderPintura() {
+if (this._sub === 'empaque') return this._renderEmpaque();
     const pinturaOps = this._ops.filter(op => op.status === 'en pintura' && op.pintor);
 
     const byPainter = {};
