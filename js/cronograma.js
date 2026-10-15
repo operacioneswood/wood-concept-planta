@@ -665,7 +665,73 @@ ${paintersHtml}
 
   // ── Helpers ───────────────────────────────────────────────
 
-  _urgencyCounts(ops) {
+  _empaqueOps() {
+return this._ops.filter(op => op.status === 'empaque').sort((a, b) => (a.project || '').localeCompare(b.project || '') || ((a.salidaFabrica || 8.64e15) - (b.salidaFabrica || 8.64e15)));
+},
+
+_renderEmpaque() {
+const ops = this._empaqueOps();
+if (!ops.length) return '<div class="cron-empty">Sin OPs en estado Empaque.</div>';
+const general = localStorage.getItem('wp_cron_empaque_general') || '';
+const bar = `<div class="cron-print-bar"><button class="cron-print-btn" id="btn-print-empaque">🖨 Imprimir reporte de empaque</button></div><div style="padding:12px 16px;margin-bottom:12px;background:var(--card);border:1px solid var(--border);border-radius:8px"><label style="font-size:12px;font-weight:600;color:var(--muted)">Comentarios generales del envío (salen en el reporte)</label><textarea id="empaque-general" rows="2" style="width:100%;margin-top:6px;padding:8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px" placeholder="Notas para el reporte de envío...">${esc(general)}</textarea></div>`;
+const byProj = {};
+for (const op of ops) { const p = op.project || 'Sin proyecto'; (byProj[p] = byProj[p] || []).push(op); }
+const blocks = Object.entries(byProj).map(([project, list]) => {
+const rows = list.map(op => { const st = this._statusInfo(op.salidaFabrica); return `<tr><td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td><td class="cron-name">${esc(op.name)}${this._contratistaTag(op)}</td><td class="cron-fecha-lbl">${op.salidaFabrica ? this._fmtShort(op.salidaFabrica) : '<span class="cron-faint">—</span>'}</td><td><span class="cron-badge ${st.cls}">${st.label}</span></td><td><input type="text" class="cron-empaque-comment-inp" data-opid="${esc(op.id)}" placeholder="Notas..." value="${esc(localStorage.getItem('wp_cron_empaque_comment_' + op.id) || '')}" style="width:100%;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-family:inherit;font-size:0.78rem"></td></tr>`; }).join('');
+return `<div class="cron-block"><div class="cron-block-hdr"><span class="cron-hdr-name">${esc(project)}</span><span class="cron-hdr-meta"><span class="cron-hdr-count">${list.length} OP${list.length !== 1 ? 's' : ''}</span></span></div><table class="cron-tbl"><thead><tr><th>No. OP</th><th>Descripción</th><th>Fecha límite</th><th>Estado</th><th>Comentarios</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}).join('');
+return bar + blocks;
+},
+
+_printEmpaque() {
+const ops = this._empaqueOps();
+const today = new Date();
+const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const todayFmt = `${today.getDate()} de ${months[today.getMonth()]} de ${today.getFullYear()}`;
+const general = localStorage.getItem('wp_cron_empaque_general') || '';
+let n = 0, lastProj = null, rows = '';
+for (const op of ops) {
+const proj = op.project || 'Sin proyecto';
+if (proj !== lastProj) { rows += `<tr class="grp"><td colspan="5">${esc(proj)}</td></tr>`; lastProj = proj; }
+n++;
+rows += `<tr><td class="td-num">${n}</td><td class="td-op">${esc(op.noOp || '—')}</td><td class="td-desc">${esc(op.name)}</td><td class="td-date">${op.salidaFabrica ? this._fmtLong(op.salidaFabrica) : '—'}</td><td class="td-comment">${esc(localStorage.getItem('wp_cron_empaque_comment_' + op.id) || '')}</td></tr>`;
+}
+const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte de Empaque</title><style>
+@page { size: letter portrait; margin: 0.65in 0.75in; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; color: #000; background: #fff; }
+.proj-hdr { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2.5pt solid #4a7c59; padding-bottom: 8pt; margin-bottom: 12pt; }
+.proj-title { font-size: 15pt; font-weight: 700; color: #4a7c59; }
+.proj-date { font-size: 9.5pt; color: #444; }
+table { width: 100%; border-collapse: collapse; }
+thead tr { background: #eef4f0; }
+th { font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #333; padding: 6pt 7pt; text-align: left; border-bottom: 1.5pt solid #a8c4b4; white-space: nowrap; }
+td { padding: 6.5pt 7pt; border-bottom: 0.5pt solid #ddeae0; vertical-align: top; line-height: 1.35; font-size: 10.5pt; }
+tr { break-inside: avoid; page-break-inside: avoid; }
+tr.grp td { background: #f2f6f3; font-weight: 700; color: #2f5d40; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1pt solid #a8c4b4; }
+.td-num { width: 18pt; text-align: center; color: #666; }
+.td-op { width: 70pt; font-weight: 700; color: #2f5d40; white-space: nowrap; }
+.td-date { width: 80pt; white-space: nowrap; }
+.td-comment { width: 150pt; }
+.gen { margin-top: 16pt; }
+.gen h3 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.05em; color: #2f5d40; margin-bottom: 4pt; }
+.gen div { min-height: 60pt; border: 0.75pt solid #a8c4b4; padding: 6pt 8pt; white-space: pre-wrap; font-size: 10.5pt; }
+.tbl-footer { margin-top: 10pt; font-size: 8.5pt; color: #666; text-align: right; }
+</style></head><body>
+<div class="proj-hdr"><div class="proj-title">Reporte de Empaque</div><div class="proj-date">${todayFmt}</div></div>
+<table><thead><tr><th>#</th><th>No. OP</th><th>Descripción</th><th>Fecha límite</th><th>Comentarios</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="gen"><h3>Comentarios</h3><div>${esc(general)}</div></div>
+<div class="tbl-footer">${ops.length} ítem${ops.length !== 1 ? 's' : ''} en empaque · Wood Concept Planta</div>
+</body></html>`;
+const win = window.open('', '_blank', 'width=900,height=700');
+if (!win) { alert('Permite ventanas emergentes para imprimir.'); return; }
+win.document.write(html);
+win.document.close();
+win.focus();
+setTimeout(() => win.print(), 400);
+},
+
+_urgencyCounts(ops) {
     const today = new Date(); today.setHours(0, 0, 0, 0);
     let overdue = 0, urgent = 0;
     for (const op of ops) {
