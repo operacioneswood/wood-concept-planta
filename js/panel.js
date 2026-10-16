@@ -18,7 +18,7 @@ const Panel = {
 
     const personData = ebanistas.map(name => {
       const role  = personasMap[name] || 'ebanista';
-      const myOps = ops.filter(op => (assignments[op.id] || []).some(a => a.person === name));
+      const myOps = [...ops, ...(App._data?.opsEmpaque || [])].filter(op => (assignments[op.id] || []).some(a => a.person === name));
       return { name, role, myOps };
     });
 
