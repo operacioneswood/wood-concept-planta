@@ -10,7 +10,9 @@ const Asignacion = {
   _stageStatusMap: {},
   _filterActive:   false,
 
-  render({ ops, ebanistas, dbData, fieldIds }) {
+  render({ ops: activeOps, opsEmpaque, ebanistas, dbData, fieldIds }) {
+// Las OPs en Empaque también se muestran, para poder asignar pendientes o retoques.
+const ops = [...(activeOps || []), ...(opsEmpaque || [])];
     this._ebanistas      = ebanistas;
     this._fieldIds       = fieldIds || {};
     this._planosMap      = App.buildPlanosMap(dbData);
