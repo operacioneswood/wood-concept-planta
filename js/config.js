@@ -38,6 +38,12 @@ const STATUS_DISPLAY = {
   'empaque':               { label: 'Empaque',              cls: 'sb-other'  },
 };
 
+// Los ítems enviados a fábrica ahora llegan con el estado "enviado a fabrica";
+// "fabrica" queda solo para las tareas (proyectos). Se tratan igual que "fabrica".
+ACTIVE_STATUSES.add('enviado a fabrica');
+PRIORITY_SHIFTABLE_STATUSES.add('enviado a fabrica');
+STATUS_DISPLAY['enviado a fabrica'] = { label: 'Enviado a fábrica', cls: 'sb-green' };
+
 // ── Priority-based fecha límite push ────────────────────────────
 // When brand-new OPs show up in a ranked project (Tablero priority list),
 // a pending proposal is created to push out the fecha límite of every
