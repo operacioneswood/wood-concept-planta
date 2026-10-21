@@ -243,7 +243,7 @@ const App = {
     }
 
     const isFirstRun = seenIds.size === 0;
-    const fabricaOps  = this._data.ops.filter(op => op.status === 'fabrica' || op.status === 'enviado a fabrica');
+    const fabricaOps  = this._data.ops.filter(op => op.status === 'enviado a fabrica');
     const unseenFabricaIds = fabricaOps.map(op => op.id).filter(id => !seenIds.has(id));
     if (unseenFabricaIds.length) {
       await DB.markOpsSeen(unseenFabricaIds).catch(e => console.warn('[App] markOpsSeen failed:', e.message));
