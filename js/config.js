@@ -25,7 +25,7 @@ const ACTIVE_STATUSES = new Set(['fabrica', 'corte', 'enchape', 'ebanisteria', '
 // these are eligible for the priority-based fecha límite push. An OP
 // already in corte/enchape/ebanistería/pintura is in progress and its
 // date should not move.
-const PRIORITY_SHIFTABLE_STATUSES = new Set(['fabrica', 'pendiente por obra', 'pendiente chapilla']);
+const PRIORITY_SHIFTABLE_STATUSES = new Set(['enviado a fabrica']);
 
 const STATUS_DISPLAY = {
   'fabrica':               { label: 'Fábrica',              cls: 'sb-green'  },
@@ -39,9 +39,8 @@ const STATUS_DISPLAY = {
 };
 
 // Los ítems enviados a fábrica ahora llegan con el estado "enviado a fabrica";
-// "fabrica" queda solo para las tareas (proyectos). Se tratan igual que "fabrica".
+// "fabrica" queda solo para las tareas (proyectos).
 ACTIVE_STATUSES.add('enviado a fabrica');
-PRIORITY_SHIFTABLE_STATUSES.add('enviado a fabrica');
 STATUS_DISPLAY['enviado a fabrica'] = { label: 'Enviado a fábrica', cls: 'sb-green' };
 
 // ── Priority-based fecha límite push ────────────────────────────
