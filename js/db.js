@@ -252,6 +252,25 @@ const DB = {
   },
 
   // ════════════════════════════════════════════════════════
+  // CRON_COMENTARIOS  (comentarios de Cronograma por OP y pestaña — compartidos
+  // entre todos los equipos; tipo = 'fabrica' | 'pintura' | 'empaque')
+  // ════════════════════════════════════════════════════════
+  async getCronComentarios() {
+    return this._q(sb => sb.from('cron_comentarios').select('op_id,tipo,texto'));
+  },
+
+  // Texto vacío = borra el comentario.
+  async setCronComentario(op_id, tipo, texto) {
+    if (!texto) {
+      const { error } = await this._sb.from('cron_comentarios').delete().eq('op_id', op_id).eq('tipo', tipo);
+      if (error) throw error;
+      return;
+    }
+    return this._q(sb => sb.from('cron_comentarios')
+      .upsert({ op_id, tipo, texto, updated_at: new Date().toISOString() }, { onConflict: 'op_id,tipo' }));
+  },
+
+  // ════════════════════════════════════════════════════════
   // VINCULOS  (2 OPs sharing one physical plano — linked as one)
   // ════════════════════════════════════════════════════════
   async getVinculos() {
