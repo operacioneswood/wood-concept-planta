@@ -16,6 +16,7 @@ const Cronograma = {
     this._ops      = [...(ops || []), ...(opsEmpaque || [])];
     this._fieldIds = fieldIds || {};
     this._dbData   = dbData;
+    this._loadComments(dbData?.cronComentarios);
     this._draw();
   },
 
@@ -24,6 +25,61 @@ const Cronograma = {
   // field during sync — see App._reconcilePriorityDates — not computed here.)
   _effectiveDate(op) {
     return op.salidaFabrica;
+  },
+
+  // ── Comentarios compartidos (Supabase: cron_comentarios) ──────────────
+  // Se guardan en la base de datos para que todos los equipos los vean. Si la
+  // tabla no responde, se usa localStorage como respaldo (solo en ese equipo).
+  _LS:    { fabrica: 'wp_cron_comment_', pintura: 'wp_cron_pintura_comment_', empaque: 'wp_cron_empaque_comment_' },
+  _cmt:   {},      // 'tipo|opId' → texto
+  _cmtOk: false,   // true cuando la tabla compartida está disponible
+  _cmtT:  {},      // temporizadores de guardado pendientes
+
+  _loadComments(rows) {
+    this._cmtOk = Array.isArray(rows);
+    if (!this._cmtOk) return;
+    const next = {};
+    for (const r of rows) next[r.tipo + '|' + r.op_id] = r.texto;
+    // No pisar lo que se está escribiendo mientras llega una actualización.
+    for (const k of Object.keys(this._cmtT)) if (this._cmtT[k] && k in this._cmt) next[k] = this._cmt[k];
+    this._cmt = next;
+    this._migrateLocalComments();
+  },
+
+  // Sube una sola vez los comentarios que estaban guardados solo en este navegador.
+  _migrateLocalComments() {
+    for (const tipo of Object.keys(this._LS)) {
+      const prefix = this._LS[tipo];
+      for (const key of Object.keys(localStorage).filter(x => x.startsWith(prefix))) {
+        const opId  = key.slice(prefix.length);
+        const local = localStorage.getItem(key) || '';
+        const k     = tipo + '|' + opId;
+        if (!local || this._cmt[k]) { localStorage.removeItem(key); continue; }   // vacío, o ya hay uno compartido
+        this._cmt[k] = local;
+        DB.setCronComentario(opId, tipo, local)
+          .then(() => localStorage.removeItem(key))
+          .catch(e => console.warn('[Cronograma] no se pudo subir el comentario:', e.message));
+      }
+    }
+  },
+
+  _cmtGet(tipo, opId) {
+    if (this._cmtOk) return this._cmt[tipo + '|' + opId] || '';
+    return localStorage.getItem(this._LS[tipo] + opId) || '';
+  },
+
+  _cmtSet(tipo, opId, val) {
+    const k = tipo + '|' + opId;
+    val = (val || '').trim();
+    this._cmt[k] = val;
+    const local = () => { if (val) localStorage.setItem(this._LS[tipo] + opId, val); else localStorage.removeItem(this._LS[tipo] + opId); };
+    if (!this._cmtOk) { local(); return; }
+    clearTimeout(this._cmtT[k]);
+    this._cmtT[k] = setTimeout(async () => {
+      this._cmtT[k] = null;
+      try { await DB.setCronComentario(opId, tipo, val); }
+      catch (e) { console.warn('[Cronograma] comentario no guardado en la base de datos:', e.message); local(); }
+    }, 500);
   },
 
   _shiftsBannerHtml() {
@@ -80,9 +136,7 @@ ${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}
     this._bindEdits(wrap);
 const prtEmp = wrap.querySelector('#btn-print-empaque');
 if (prtEmp) prtEmp.addEventListener('click', () => this._printEmpaque());
-wrap.querySelectorAll('.cron-empaque-comment-inp').forEach(inp => inp.addEventListener('input', () => { const v = inp.value.trim(); if (v) localStorage.setItem('wp_cron_empaque_comment_' + inp.dataset.opid, v); else localStorage.removeItem('wp_cron_empaque_comment_' + inp.dataset.opid); }));
-const genEmp = wrap.querySelector('#empaque-general');
-if (genEmp) genEmp.addEventListener('input', () => { const v = genEmp.value.trim(); if (v) localStorage.setItem('wp_cron_empaque_general', v); else localStorage.removeItem('wp_cron_empaque_general'); });
+wrap.querySelectorAll('.cron-empaque-comment-inp').forEach(inp => inp.addEventListener('input', () => this._cmtSet('empaque', inp.dataset.opid, inp.value)));
 const searchInp = wrap.querySelector('#cron-search');
 if (searchInp) {
 const applySearch = () => { this._search = searchInp.value; const q = normStr(searchInp.value); wrap.querySelectorAll('.cron-block').forEach(block => { const hdrHit = !q || normStr(block.querySelector('.cron-hdr-name')?.textContent || '').includes(q); let any = false; block.querySelectorAll('tbody tr').forEach(tr => { const txt = normStr(tr.textContent + ' ' + [...tr.querySelectorAll('input[type=text]')].map(i => i.value).join(' ')); const show = hdrHit || txt.includes(q); tr.style.display = show ? '' : 'none'; if (show) any = true; }); block.style.display = any ? '' : 'none'; }); };
@@ -157,7 +211,7 @@ applySearch();
         const opid2Attr = linkedOp ? ` data-opid2="${esc(linkedOp.id)}"` : '';
         const effDate   = this._effectiveDate(op);
         const st = this._statusInfo(effDate);
-        const savedComment = localStorage.getItem('wp_cron_comment_' + op.id) || '';
+        const savedComment = this._cmtGet('fabrica', op.id);
         return `
           <tr>
             <td>
@@ -328,7 +382,7 @@ applySearch();
           <input type="text" class="cron-pintura-comment-inp"
             data-opid="${esc(op.id)}"
             placeholder="Notas…"
-            value="${esc(localStorage.getItem('wp_cron_pintura_comment_' + op.id) || '')}">
+            value="${esc(this._cmtGet('pintura', op.id))}">
         </td>
       </tr>
     `;
@@ -434,7 +488,7 @@ if (this._sub === 'empaque') return this._renderEmpaque();
     });
 
     const rows = sorted.map((op, idx) => {
-      const saved      = localStorage.getItem('wp_cron_comment_' + op.id) || '';
+      const saved      = this._cmtGet('fabrica', op.id);
       const comentario = saved || (op.status === 'pendiente por obra' ? 'Pendiente por obra' : '');
       return `<tr>
         <td class="td-num">${idx + 1}</td>
@@ -679,12 +733,11 @@ return this._ops.filter(op => op.status === 'empaque').sort((a, b) => (a.project
 _renderEmpaque() {
 const ops = this._empaqueOps();
 if (!ops.length) return '<div class="cron-empty">Sin OPs en estado Empaque.</div>';
-const general = localStorage.getItem('wp_cron_empaque_general') || '';
 const bar = `<div class="cron-print-bar"><button class="cron-print-btn" id="btn-print-empaque">🖨 Imprimir reporte de empaque</button></div>`;
 const byProj = {};
 for (const op of ops) { const p = op.project || 'Sin proyecto'; (byProj[p] = byProj[p] || []).push(op); }
 const blocks = Object.entries(byProj).map(([project, list]) => {
-const rows = list.map(op => { const st = this._statusInfo(op.salidaFabrica); return `<tr><td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td><td class="cron-name">${esc(op.name)}${this._contratistaTag(op)}</td><td class="cron-fecha-lbl">${op.salidaFabrica ? this._fmtShort(op.salidaFabrica) : '<span class="cron-faint">—</span>'}</td><td><span class="cron-badge ${st.cls}">${st.label}</span></td><td><input type="text" class="cron-empaque-comment-inp" data-opid="${esc(op.id)}" placeholder="Notas..." value="${esc(localStorage.getItem('wp_cron_empaque_comment_' + op.id) || '')}" style="width:100%;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-family:inherit;font-size:0.78rem"></td></tr>`; }).join('');
+const rows = list.map(op => { const st = this._statusInfo(op.salidaFabrica); return `<tr><td>${op.noOp ? `<span class="cron-op-num">${esc(op.noOp)}</span>` : '<span class="cron-faint">—</span>'}</td><td class="cron-name">${esc(op.name)}${this._contratistaTag(op)}</td><td class="cron-fecha-lbl">${op.salidaFabrica ? this._fmtShort(op.salidaFabrica) : '<span class="cron-faint">—</span>'}</td><td><span class="cron-badge ${st.cls}">${st.label}</span></td><td><input type="text" class="cron-empaque-comment-inp" data-opid="${esc(op.id)}" placeholder="Notas..." value="${esc(this._cmtGet('empaque', op.id))}" style="width:100%;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-family:inherit;font-size:0.78rem"></td></tr>`; }).join('');
 return `<div class="cron-block"><div class="cron-block-hdr"><span class="cron-hdr-name">${esc(project)}</span><span class="cron-hdr-meta"><span class="cron-hdr-count">${list.length} OP${list.length !== 1 ? 's' : ''}</span></span></div><table class="cron-tbl"><thead><tr><th>No. OP</th><th>Descripción</th><th>Fecha límite</th><th>Estado</th><th>Comentarios</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }).join('');
 return bar + blocks;
@@ -695,13 +748,12 @@ const ops = this._empaqueOps();
 const today = new Date();
 const months = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const todayFmt = `${today.getDate()} de ${months[today.getMonth()]} de ${today.getFullYear()}`;
-const general = localStorage.getItem('wp_cron_empaque_general') || '';
 let n = 0, lastProj = null, rows = '';
 for (const op of ops) {
 const proj = op.project || 'Sin proyecto';
 if (proj !== lastProj) { rows += `<tr class="grp"><td colspan="4">${esc(proj)}</td></tr>`; lastProj = proj; }
 n++;
-rows += `<tr><td class="td-num">${n}</td><td class="td-op">${esc(op.noOp || '—')}</td><td class="td-desc">${esc(op.name)}</td><td class="td-comment">${esc(localStorage.getItem('wp_cron_empaque_comment_' + op.id) || '')}</td></tr>`;
+rows += `<tr><td class="td-num">${n}</td><td class="td-op">${esc(op.noOp || '—')}</td><td class="td-desc">${esc(op.name)}</td><td class="td-comment">${esc(this._cmtGet('empaque', op.id))}</td></tr>`;
 }
 // Semana siguiente (lunes a viernes), para el reporte de lo que se envía la próxima semana.
 const dow = today.getDay() || 7;
@@ -848,12 +900,7 @@ _urgencyCounts(ops) {
       inp.addEventListener('input', () => {
         const { opid } = inp.dataset;
         if (!opid) return;
-        const val = inp.value.trim();
-        if (val) {
-          localStorage.setItem('wp_cron_comment_' + opid, val);
-        } else {
-          localStorage.removeItem('wp_cron_comment_' + opid);
-        }
+        this._cmtSet('fabrica', opid, inp.value);
       });
     });
 
@@ -861,12 +908,7 @@ _urgencyCounts(ops) {
       inp.addEventListener('input', () => {
         const { opid } = inp.dataset;
         if (!opid) return;
-        const val = inp.value.trim();
-        if (val) {
-          localStorage.setItem('wp_cron_pintura_comment_' + opid, val);
-        } else {
-          localStorage.removeItem('wp_cron_pintura_comment_' + opid);
-        }
+        this._cmtSet('pintura', opid, inp.value);
       });
     });
 
