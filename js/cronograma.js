@@ -699,11 +699,16 @@ const general = localStorage.getItem('wp_cron_empaque_general') || '';
 let n = 0, lastProj = null, rows = '';
 for (const op of ops) {
 const proj = op.project || 'Sin proyecto';
-if (proj !== lastProj) { rows += `<tr class="grp"><td colspan="5">${esc(proj)}</td></tr>`; lastProj = proj; }
+if (proj !== lastProj) { rows += `<tr class="grp"><td colspan="4">${esc(proj)}</td></tr>`; lastProj = proj; }
 n++;
-rows += `<tr><td class="td-num">${n}</td><td class="td-op">${esc(op.noOp || '—')}</td><td class="td-desc">${esc(op.name)}</td><td class="td-date">${op.salidaFabrica ? this._fmtLong(op.salidaFabrica) : '—'}</td><td class="td-comment">${esc(localStorage.getItem('wp_cron_empaque_comment_' + op.id) || '')}</td></tr>`;
+rows += `<tr><td class="td-num">${n}</td><td class="td-op">${esc(op.noOp || '—')}</td><td class="td-desc">${esc(op.name)}</td><td class="td-comment">${esc(localStorage.getItem('wp_cron_empaque_comment_' + op.id) || '')}</td></tr>`;
 }
-const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte de Empaque</title><style>
+// Semana siguiente (lunes a viernes), para el reporte de lo que se envía la próxima semana.
+const dow = today.getDay() || 7;
+const mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 8 - dow);
+const fri = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + 4);
+const weekFmt = mon.getMonth() === fri.getMonth() ? `${mon.getDate()}-${fri.getDate()} de ${months[mon.getMonth()]} de ${fri.getFullYear()}` : `${mon.getDate()} de ${months[mon.getMonth()]} - ${fri.getDate()} de ${months[fri.getMonth()]} de ${fri.getFullYear()}`;
+const html = `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte Empaque</title><style>
 @page { size: letter portrait; margin: 0.65in 0.75in; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-size: 11pt; color: #000; background: #fff; }
@@ -718,15 +723,13 @@ tr { break-inside: avoid; page-break-inside: avoid; }
 tr.grp td { background: #f2f6f3; font-weight: 700; color: #2f5d40; font-size: 10pt; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1pt solid #a8c4b4; }
 .td-num { width: 18pt; text-align: center; color: #666; }
 .td-op { width: 70pt; font-weight: 700; color: #2f5d40; white-space: nowrap; }
-.td-date { width: 80pt; white-space: nowrap; }
-.td-comment { width: 150pt; }
 .gen { margin-top: 16pt; }
 .gen h3 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.05em; color: #2f5d40; margin-bottom: 4pt; }
 .gen div { min-height: 60pt; border: 0.75pt solid #a8c4b4; padding: 6pt 8pt; white-space: pre-wrap; font-size: 10.5pt; }
 .tbl-footer { margin-top: 10pt; font-size: 8.5pt; color: #666; text-align: right; }
 </style></head><body>
-<div class="proj-hdr"><div class="proj-title">Reporte de Empaque</div><div class="proj-date">${todayFmt}</div></div>
-<table><thead><tr><th>#</th><th>No. OP</th><th>Descripción</th><th>Fecha límite</th><th>Comentarios</th></tr></thead><tbody>${rows}</tbody></table>
+<div class="proj-hdr"><div class="proj-title">Reporte Empaque</div><div class="proj-date">${weekFmt}</div></div>
+<table><thead><tr><th>#</th><th>No. OP</th><th>Descripción</th><th>Comentarios</th></tr></thead><tbody>${rows}</tbody></table>
 
 <div class="tbl-footer">${ops.length} ítem${ops.length !== 1 ? 's' : ''} en empaque · Wood Concept Planta</div>
 </body></html>`;
