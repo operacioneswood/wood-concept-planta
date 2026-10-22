@@ -150,6 +150,8 @@ const App = {
         partes:       partes       || [],
         vinculos:     vinculos     || [],
       };
+      // Comentarios compartidos del Cronograma (null = la tabla no responde; se usa localStorage).
+      this._dbData.cronComentarios = await DB.getCronComentarios().catch(e => { console.warn('[App] cron_comentarios table missing?', e.message); return null; });
     } catch (e) {
       console.error('[App] DB load failed:', e.message);
     }
