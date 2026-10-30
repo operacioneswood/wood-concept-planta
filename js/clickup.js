@@ -340,6 +340,36 @@ const PlantaAPI = {
     catch { return {}; }
   },
 
+  // ── Clear the built-in due date on a task ───────────────
+  async clearDueDate(taskId) {
+    const apiKey = this.getApiKey();
+    const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}`, {
+      method:  'PUT',
+      headers: { Authorization: apiKey, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ due_date: null }),
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => String(res.status));
+      throw new Error(`ClickUp due_date ${res.status}: ${msg}`);
+    }
+    // La respuesta es la tarea ya actualizada: si todavía trae fecha, ClickUp no la borró.
+    const task = await res.json().catch(() => null);
+    if (task && task.due_date) throw new Error('ClickUp no permitió quitar la fecha límite de esta tarea');
+  },
+
+  // ── Clear a custom field's value (ClickUp has no "set to null": it's a DELETE) ──
+  async removeField(taskId, fieldId) {
+    const apiKey = this.getApiKey();
+    const res = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/field/${fieldId}`, {
+      method:  'DELETE',
+      headers: { Authorization: apiKey },
+    });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => String(res.status));
+      throw new Error(`ClickUp field ${res.status}: ${msg}`);
+    }
+  },
+
   // ── Mark OP complete in ClickUp ──────────────────────────
   async markComplete(opId, statusName = 'BODEGA') {
     const apiKey = this.getApiKey();
