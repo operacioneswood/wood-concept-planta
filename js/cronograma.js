@@ -864,13 +864,19 @@ _urgencyCounts(ops) {
         const op = this._ops.find(o => o.id === opid);
         if (!op) return;
         const val = inp.value;
-        if (!val) return;
-        const ms = new Date(val + 'T00:00:00').getTime();
+        const clearing = !val;   // fecha borrada → también se borra en ClickUp
+        if (clearing) {
+          // Editar un segmento de la fecha a mano también deja el campo vacío por un instante: se confirma antes de borrar.
+          const prev = fieldkey === 'salidaFabrica' ? op.salidaFabrica : op[fieldkey];
+          if (!prev) return;   // ya estaba vacía, nada que borrar
+          if (!confirm('¿Quitar esta fecha también en ClickUp?')) { inp.value = this._toInputVal(prev); return; }
+        }
+        const ms = clearing ? null : new Date(val + 'T00:00:00').getTime();
         inp.disabled = true;
         try {
           if (fieldkey === 'salidaFabrica') {
             // Built-in ClickUp due date
-            await Promise.all(ids.map(id => PlantaAPI.setDueDate(id, ms)));
+            await Promise.all(ids.map(id => clearing ? PlantaAPI.clearDueDate(id) : PlantaAPI.setDueDate(id, ms)));
           } else {
             // Custom date field (e.g. inicioPintura)
             const fid = this._fieldIds[fieldkey];
@@ -879,11 +885,11 @@ _urgencyCounts(ops) {
               inp.disabled = false;
               return;
             }
-            await Promise.all(ids.map(id => PlantaAPI.setField(id, fid, ms)));
+            await Promise.all(ids.map(id => clearing ? PlantaAPI.removeField(id, fid) : PlantaAPI.setField(id, fid, ms)));
           }
           for (const id of ids) {
             const o = this._ops.find(x => x.id === id);
-            if (o) o[fieldkey] = new Date(ms);
+            if (o) o[fieldkey] = clearing ? null : new Date(ms);
           }
           inp.style.outline = '2px solid var(--green)';
           setTimeout(() => { inp.style.outline = ''; inp.disabled = false; }, 1200);
