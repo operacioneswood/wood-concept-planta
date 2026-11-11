@@ -54,7 +54,13 @@ const Reprocesos = {
   _setOps(ops) {
     this._ops = ops || [];
     this._opMap = {};
-    for (const o of this._ops) if (o.noOp) this._opMap[String(o.noOp).trim()] = o;
+    for (const o of this._ops) {
+      if (!o.noOp) continue;
+      const k = String(o.noOp).trim();
+      this._opMap[k] = o;
+      const m = k.match(/^(\d{4,6})-(\d{1,3})$/);          // "26027-5" también se encuentra como "26027-05"
+      if (m) this._opMap[`${m[1]}-${String(m[2]).padStart(2, '0')}`] = this._opMap[`${m[1]}-${String(m[2]).padStart(2, '0')}`] || o;
+    }
   },
 
   // "OP. 25177-02/03" → ['25177-02', '25177-03']
@@ -70,7 +76,17 @@ const Reprocesos = {
     return out;
   },
 
-  _opsDe(r) { return this._parseOps(r.op_texto).map(n => this._opMap[n]).filter(Boolean); },
+  // OPs reales a las que se refiere el reproceso: por los números que traiga el texto,
+  // o por el valor tal cual (p. ej. "26076", una OP sin guion).
+  _opsDe(r) {
+    const claves = this._parseOps(r.op_texto);
+    const crudo = (r.op_texto || '').trim();
+    if (crudo) claves.push(crudo);
+    const vistos = new Set();
+    const out = [];
+    claves.forEach(k => { const o = this._opMap[k]; if (o && !vistos.has(o.id)) { vistos.add(o.id); out.push(o); } });
+    return out;
+  },
 
   // ── Entrada ──────────────────────────────────────────────────
   mount(root, { ops } = {}) {
