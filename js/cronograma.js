@@ -17,6 +17,7 @@ const Cronograma = {
     this._fieldIds = fieldIds || {};
     this._dbData   = dbData;
     this._loadComments(dbData?.cronComentarios);
+    Reprocesos.refresh();   // mantiene al día el contador de reprocesos abiertos
     this._draw();
   },
 
@@ -109,10 +110,11 @@ const Cronograma = {
         <button class="cron-subtab ${this._sub === 'fabrica' ? 'active' : ''}" data-sub="fabrica">🏭 Fábrica</button>
         <button class="cron-subtab ${this._sub === 'pintura' ? 'active' : ''}" data-sub="pintura">🎨 Pintura</button>
 <button class="cron-subtab ${this._sub === 'empaque' ? 'active' : ''}" data-sub="empaque">📦 Empaque (${this._empaqueOps().length})</button>
+        <button class="cron-subtab ${this._sub === 'reprocesos' ? 'active' : ''}" data-sub="reprocesos">⚠ Reprocesos (<span data-repro-count>${Reprocesos.openCount()}</span>)</button>
       </div>
       <div class="cron-body">
-        <div class="asign-search-wrap" style="padding-top:12px"><input type="search" id="cron-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre..." value="${esc(this._search || '')}"></div>
-${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}
+${this._sub === 'reprocesos' ? '<div id="repro-wrap"></div>' : `        <div class="asign-search-wrap" style="padding-top:12px"><input type="search" id="cron-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre..." value="${esc(this._search || '')}"></div>
+${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}`}
       </div>
     `;
     wrap.querySelector('#btn-dismiss-shifts')?.addEventListener('click', () => {
@@ -125,6 +127,7 @@ ${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}
         this._draw();
       });
     });
+    if (this._sub === 'reprocesos') Reprocesos.mount(wrap.querySelector('#repro-wrap'), { ops: this._ops });
     wrap.querySelectorAll('.cron-view-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         this._fabView = btn.dataset.view;
