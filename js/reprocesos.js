@@ -150,6 +150,7 @@ const Reprocesos = {
           ${r.encargado ? `<span>Reportó: ${esc(r.encargado)}</span>` : ''}
           ${r.disenador ? `<span>Diseñador: ${esc(r.disenador)}</span>` : ''}
           ${imgs.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">📎 Imagen${imgs.length > 1 ? ' ' + (i + 1) : ''}</a>`).join('')}
+          ${r.clickup_task_id && r.estado_previo ? `<span class="rp-cu">🔗 ClickUp: ${r.clickup_restaurado ? 'regresó a' : 'en Reproceso · antes:'} ${esc(r.estado_previo)}</span>` : ''}
         </div>
         <div class="rp-acts">
           ${term
@@ -257,18 +258,97 @@ const Reprocesos = {
       this._updateLabels();
       this._draw();
       alert('No se pudo guardar el cambio: ' + (e.message || e));
+      return;
+    }
+    // La OP cambió de estado en ClickUp al llegar el reproceso: al terminarlo vuelve a su estado, y al reabrirlo regresa a Reproceso.
+    if (campos.estado === 'terminado' && antes.estado !== 'terminado') await this._alTerminar(r);
+    else if (campos.estado === 'abierto' && antes.estado === 'terminado') await this._alReabrir(r);
+  },
+
+  // ── Estado de la OP en ClickUp ───────────────────────────────
+  async _cu(metodo, path, cuerpo) {
+    const res = await fetch('https://api.clickup.com/api/v2/' + path, {
+      method: metodo,
+      headers: { Authorization: PlantaAPI.getApiKey(), 'Content-Type': 'application/json' },
+      body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+    });
+    if (!res.ok) throw new Error(`ClickUp ${res.status}`);
+    const txt = await res.text();
+    return txt ? JSON.parse(txt) : {};
+  },
+
+  async _guardarExtra(id, campos) {
+    const r = this._rows.find(x => x.id === id);
+    if (r) Object.assign(r, campos);
+    const { error } = await DB._sb.from('reprocesos').update(campos).eq('id', id);
+    if (error) throw error;
+  },
+
+  // Reproceso terminado → la OP regresa al estado en que estaba (solo si sigue en "Reproceso").
+  async _alTerminar(r) {
+    if (!r.clickup_task_id || !r.estado_previo || r.clickup_restaurado) return;
+    const previo = r.estado_previo;
+    try {
+      // Si la misma OP tiene otro reproceso abierto de fábrica, la OP sigue en Reproceso:
+      // se le pasa a ese el estado anterior para que la regrese cuando termine.
+      const otro = this._rows.find(x => x.id !== r.id && x.estado !== 'terminado' && x.atencion === 'fabrica' &&
+        (x.op_texto || '').trim() && (x.op_texto || '').trim() === (r.op_texto || '').trim());
+      if (otro) {
+        await this._guardarExtra(otro.id, { clickup_task_id: r.clickup_task_id, estado_previo: r.estado_previo });
+        await this._guardarExtra(r.id, { clickup_task_id: null, estado_previo: null });
+        this._draw();
+        alert('La OP sigue en estado Reproceso en ClickUp porque tiene otro reproceso abierto. Regresará a "' + previo + '" cuando termine ese.');
+        return;
+      }
+      const t = await this._cu('GET', 'task/' + r.clickup_task_id);
+      if (this._norm(t.status && t.status.status) !== 'reproceso') {
+        await this._guardarExtra(r.id, { clickup_restaurado: true });
+        this._draw();
+        alert('Reproceso terminado. La OP ya no estaba en estado Reproceso en ClickUp (está en "' + (t.status && t.status.status) + '"), así que no se cambió.');
+        return;
+      }
+      await this._cu('PUT', 'task/' + r.clickup_task_id, { status: r.estado_previo });
+      await this._guardarExtra(r.id, { clickup_restaurado: true });
+      this._draw();
+    } catch (e) {
+      alert('El reproceso quedó terminado, pero la OP no pudo regresar a "' + previo + '" en ClickUp (' + (e.message || e) + '). Cámbiala a mano en ClickUp.');
+    }
+  },
+
+  // Reproceso reabierto → la OP vuelve a estado Reproceso.
+  async _alReabrir(r) {
+    if (!r.clickup_task_id || !r.clickup_restaurado) return;
+    try {
+      const t = await this._cu('GET', 'task/' + r.clickup_task_id);
+      const lista = await this._cu('GET', 'list/' + (t.list && t.list.id));
+      const est = (lista.statuses || []).find(s => this._norm(s.status) === 'reproceso');
+      if (!est) throw new Error('la lista no tiene estado Reproceso');
+      if (this._norm(t.status && t.status.status) !== 'reproceso') {
+        await this._guardarExtra(r.id, { estado_previo: t.status && t.status.status });
+        await this._cu('PUT', 'task/' + r.clickup_task_id, { status: est.status });
+      }
+      await this._guardarExtra(r.id, { clickup_restaurado: false });
+      this._draw();
+    } catch (e) {
+      alert('El reproceso se reabrió, pero la OP no pudo pasar a Reproceso en ClickUp (' + (e.message || e) + ').');
     }
   },
 
   async _borrar(id) {
     if (!confirm('¿Borrar este reproceso definitivamente? No se puede deshacer.')) return;
+    const r = this._rows.find(x => x.id === id);
     try {
       const { error } = await DB._sb.from('reprocesos').delete().eq('id', id);
       if (error) throw error;
-      this._rows = this._rows.filter(r => r.id !== id);
+      this._rows = this._rows.filter(x => x.id !== id);
       this._updateLabels();
       this._draw();
-    } catch (e) { alert('No se pudo borrar: ' + (e.message || e)); }
+    } catch (e) { alert('No se pudo borrar: ' + (e.message || e)); return; }
+    // Si estaba abierto y la OP sigue en Reproceso por este reproceso, se ofrece regresarla.
+    if (r && r.estado !== 'terminado' && r.clickup_task_id && r.estado_previo && !r.clickup_restaurado &&
+        confirm('Esta OP está en estado Reproceso en ClickUp.\n\n¿Regresarla a "' + r.estado_previo + '"?')) {
+      await this._alTerminar(r);
+    }
   },
 
   // ── Agregar a mano ───────────────────────────────────────────
@@ -346,6 +426,7 @@ const Reprocesos = {
 .rp-motivo{margin-top:4px;font-size:13px;white-space:pre-wrap}
 .rp-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#6b645c;margin-top:6px}
 .rp-meta a{color:#8B1A1A}
+.rp-cu{background:#f1ede6;border-radius:10px;padding:1px 8px;color:#4a443d}
 .rp-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e8e0db}
 .rp-sel{font-size:12px;color:#6b645c;display:flex;gap:6px;align-items:center}
 .rp-sel select{font-size:13px;padding:4px 6px;border:1px solid #d8d2cb;border-radius:6px;background:#fff}
