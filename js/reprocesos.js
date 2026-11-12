@@ -130,6 +130,18 @@ const Reprocesos = {
     return k.startsWith('dise') ? 'dis' : k.startsWith('fabr') ? 'fab' : k.startsWith('inst') ? 'ins' : k.startsWith('clie') ? 'cli' : 'otr';
   },
 
+  // Miniatura clicable (fotos de Google Drive). Si no carga (archivo privado u otro sitio), queda un enlace de texto.
+  _foto(u, i, total) {
+    const m = u.match(/[?&]id=([\w-]+)/) || u.match(/\/d\/([\w-]+)/);
+    const etiqueta = '📎 Imagen' + (total > 1 ? ' ' + (i + 1) : '');
+    if (!m) return `<a class="rp-lnk" href="${esc(u)}" target="_blank" rel="noopener">${etiqueta}</a>`;
+    const big = `https://drive.google.com/file/d/${m[1]}/view`;
+    const th  = `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`;
+    return `<a class="rp-foto" href="${big}" target="_blank" rel="noopener" title="Abrir imagen">` +
+           `<img src="${th}" alt="${etiqueta}" loading="lazy" ` +
+           `onerror="this.parentNode.classList.add('rp-lnk');this.parentNode.textContent='${etiqueta}'"></a>`;
+  },
+
   _card(r) {
     const term = r.estado === 'terminado';
     const ops  = this._opsDe(r);
@@ -149,9 +161,9 @@ const Reprocesos = {
         <div class="rp-meta">
           ${r.encargado ? `<span>Reportó: ${esc(r.encargado)}</span>` : ''}
           ${r.disenador ? `<span>Diseñador: ${esc(r.disenador)}</span>` : ''}
-          ${imgs.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">📎 Imagen${imgs.length > 1 ? ' ' + (i + 1) : ''}</a>`).join('')}
           ${r.clickup_task_id && r.estado_previo ? `<span class="rp-cu">🔗 ClickUp: ${r.clickup_restaurado ? 'regresó a' : 'en Reproceso · antes:'} ${esc(r.estado_previo)}</span>` : ''}
         </div>
+        ${imgs.length ? `<div class="rp-fotos">${imgs.map((u, i) => this._foto(u, i, imgs.length)).join('')}</div>` : ''}
         <div class="rp-acts">
           ${term
             ? `<span class="rp-dim">Terminado ${r.terminado_en ? esc(this._fmt(r.terminado_en)) : ''}</span>
@@ -426,6 +438,10 @@ const Reprocesos = {
 .rp-motivo{margin-top:4px;font-size:13px;white-space:pre-wrap}
 .rp-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#6b645c;margin-top:6px}
 .rp-meta a{color:#8B1A1A}
+.rp-fotos{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.rp-foto{display:block;width:96px;height:96px;border-radius:8px;overflow:hidden;border:1px solid #e3ddd4;background:#f0ece6}
+.rp-foto img{width:100%;height:100%;object-fit:cover;display:block}
+.rp-lnk{font-size:12px;color:#8B1A1A;width:auto;height:auto;border:0;background:none}
 .rp-cu{background:#f1ede6;border-radius:10px;padding:1px 8px;color:#4a443d}
 .rp-acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed #e8e0db}
 .rp-sel{font-size:12px;color:#6b645c;display:flex;gap:6px;align-items:center}
