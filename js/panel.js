@@ -7,8 +7,31 @@ const Panel = {
   _planosMap:      {},
   _personasMap:    {},
   _stageStatusMap: {},
+  _sub:            'personal',   // 'personal' | 'reprocesos'
+  _subOk:          false,
+
+  // Pestañas del Panel: "Personal" (lo de siempre) y "Reprocesos", más el botón Actualizaciones.
+  _initSubtabs() {
+    if (this._subOk) return;
+    this._subOk = true;
+    document.querySelectorAll('#panel-subtabs .cron-subtab').forEach(b => {
+      b.addEventListener('click', () => { this._sub = b.dataset.psub; this._applySub(); });
+    });
+    el('btn-novedades')?.addEventListener('click', () => Novedades.open());
+  },
+
+  _applySub() {
+    const rep = this._sub === 'reprocesos';
+    document.querySelectorAll('#panel-subtabs .cron-subtab').forEach(b => b.classList.toggle('active', b.dataset.psub === this._sub));
+    el('panel-metrics').style.display = rep ? 'none' : '';
+    el('panel-body').style.display    = rep ? 'none' : '';
+    el('panel-repro').style.display   = rep ? '' : 'none';
+    if (rep) Reprocesos.mount(el('panel-repro'), { ops: [...(App._data?.ops || []), ...(App._data?.opsEmpaque || [])] });
+  },
 
   render({ ops, ebanistas, dbData, fieldIds }) {
+    this._initSubtabs();
+    Reprocesos.refresh();   // mantiene al día el contador de reprocesos abiertos
     this._fieldIds       = fieldIds || {};
     this._planosMap      = App.buildPlanosMap(dbData);
     this._stageStatusMap = App.buildStageStatusMap(ops);
@@ -62,6 +85,7 @@ const Panel = {
     this._bindMove();
     this._bindActions();
     this._bindPartes();
+    if (this._sub === 'reprocesos') this._applySub();   // refresca la lista de reprocesos con las OPs actuales
   },
 
   _renderSection(title, people, assignments) {
