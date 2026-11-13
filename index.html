@@ -41,9 +41,15 @@
 
     <!-- ══════════════ PANEL ══════════════ -->
     <div id="tab-panel" class="tab-screen tab-active">
+      <div class="cron-subtabs" id="panel-subtabs">
+        <button class="cron-subtab active" data-psub="personal">👷 Personal</button>
+        <button class="cron-subtab" data-psub="reprocesos">⚠ Reprocesos (<span data-repro-count>0</span>)</button>
+        <button class="btn-primary btn-sm cron-nov-btn" id="btn-novedades" style="margin-left:auto;align-self:center" title="Qué llegó a fábrica y hasta dónde avanzó, según ClickUp">🔔 Actualizaciones</button>
+      </div>
       <div class="tab-wrap">
         <div id="panel-metrics" class="metrics-strip"></div>
         <div id="panel-body"></div>
+        <div id="panel-repro" style="display:none"></div>
       </div>
     </div>
 
