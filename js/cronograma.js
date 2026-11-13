@@ -111,6 +111,7 @@ const Cronograma = {
         <button class="cron-subtab ${this._sub === 'pintura' ? 'active' : ''}" data-sub="pintura">🎨 Pintura</button>
 <button class="cron-subtab ${this._sub === 'empaque' ? 'active' : ''}" data-sub="empaque">📦 Empaque (${this._empaqueOps().length})</button>
         <button class="cron-subtab ${this._sub === 'reprocesos' ? 'active' : ''}" data-sub="reprocesos">⚠ Reprocesos (<span data-repro-count>${Reprocesos.openCount()}</span>)</button>
+        <button class="btn-primary btn-sm cron-nov-btn" id="btn-novedades" style="margin-left:auto;align-self:center" title="Qué llegó a fábrica y hasta dónde avanzó, según ClickUp">🔔 Actualizaciones</button>
       </div>
       <div class="cron-body">
 ${this._sub === 'reprocesos' ? '<div id="repro-wrap"></div>' : `        <div class="asign-search-wrap" style="padding-top:12px"><input type="search" id="cron-search" class="asign-search-input" placeholder="Buscar proyecto, número OP o nombre..." value="${esc(this._search || '')}"></div>
@@ -121,6 +122,7 @@ ${this._sub === 'fabrica' ? this._renderFabrica() : this._renderPintura()}`}
       App._lastPriorityShifts = [];
       this._draw();
     });
+    wrap.querySelector('#btn-novedades')?.addEventListener('click', () => Novedades.open());
     wrap.querySelectorAll('.cron-subtab').forEach(btn => {
       btn.addEventListener('click', () => {
         this._sub = btn.dataset.sub;
