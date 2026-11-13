@@ -1539,6 +1539,13 @@ body.has-pending-shift .app-body { padding-top: 0; }
 .cron-subtab:hover { color: var(--text); }
 .cron-subtab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 
+/* Celular: las pestañas y el botón Actualizaciones pasan a varias filas en vez de salirse de la pantalla */
+@media (max-width: 560px) {
+  .cron-subtabs { flex-wrap: wrap; padding: 0 6px; position: static; }
+  .cron-subtab { flex: 1 1 auto; padding: 10px 8px; font-size: 0.78rem; white-space: nowrap; text-align: center; }
+  .cron-subtabs .cron-nov-btn { flex: 1 1 100%; margin: 6px 0 8px !important; }
+}
+
 .cron-body { padding: 20px; }
 
 .cron-block {
