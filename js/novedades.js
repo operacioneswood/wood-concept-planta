@@ -34,7 +34,6 @@ const Novedades = {
     'en ebanisteria':        { label: 'Ebanistería',           icon: '🔨', grupo: 'ebanisteria' },
     'pendiente de revision': { label: 'Pendiente de revisión', icon: '🔍', grupo: null },
     'en pintura':            { label: 'Pintura',               icon: '🎨', grupo: 'pintura' },
-    'pendiente por obra':    { label: 'Pendiente por obra',    icon: '⏸',  grupo: null },
     'reproceso':             { label: 'Reproceso',             icon: '⚠',  grupo: 'reproceso' },
     'empaque':               { label: 'Empaque',               icon: '📦', grupo: 'empaque' },
     'bodega':                { label: 'Bodega',                icon: '🏬', grupo: null },
